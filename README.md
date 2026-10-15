@@ -1,6 +1,6 @@
 # Fieldnotes
 
-[![CI](https://github.com/KonyAHS/fieldnotes/actions/workflows/ci.yml/badge.svg)](https://github.com/KonyAHS/fieldnotes/actions/workflows/ci.yml)
+[![CI](https://github.com/KonyAHS/fieldnotes/actions/workflows/ci.yml/badge.svg)](https://github.com/KonyAHS/fieldnotes/actions/workflows/ci.yml) [![Docker Hub](https://img.shields.io/docker/v/konyoshino/fieldnotes?label=docker%20hub&sort=semver)](https://hub.docker.com/r/konyoshino/fieldnotes)
 
 A self-hosted, offline-first travel planner with a spreadsheet-style timeline, itinerary branches, offline editing, nearby restaurant search, hiking and cycling routes, and visa itinerary exports for Japan, Korea and China. React/TypeScript, a small Node server, and SQLite. No paid map API or cloud database is needed.
 
