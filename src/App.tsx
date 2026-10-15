@@ -44,6 +44,7 @@ import {
   StickyNote,
   Bus,
   Map as MapIcon,
+  UserRound,
 } from "lucide-react";
 import {
   useWorkspace,
@@ -891,7 +892,11 @@ export default function App() {
             aria-label="Trip settings"
             onClick={() => setEditor({ kind: "trip", trip })}
           >
-            {trip.applicant ? trip.applicant.charAt(0).toUpperCase() : "K"}
+            {trip.applicant ? (
+              trip.applicant.charAt(0).toUpperCase()
+            ) : (
+              <UserRound size={17} />
+            )}
           </button>
         </header>
         <div className="page-content">
@@ -973,8 +978,8 @@ export default function App() {
             <div className="notice">
               <AlertTriangle size={17} />
               This home screen app was added from a plain http:// address, so it
-              can't open without a connection. Open the app's https://
-              address in Safari and add that to the home screen instead.
+              can't open without a connection. Open the app's https:// address
+              in Safari and add that to the home screen instead.
             </div>
           )}
           {update && (

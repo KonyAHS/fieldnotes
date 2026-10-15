@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t">
+  <title id="t">Fieldnotes</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f5c4e"/>
+      <stop offset="1" stop-color="#2c4237"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- notebook -->
+  <g transform="rotate(-6 256 256)">
+    <rect x="132" y="96" width="256" height="320" rx="30" fill="#1f3029" opacity=".35" transform="translate(10 14)"/>
+    <rect x="132" y="96" width="256" height="320" rx="30" fill="#f6f3e9"/>
+    <rect x="132" y="96" width="44" height="320" rx="22" fill="#e4dfcf"/>
+    <rect x="160" y="96" width="16" height="320" fill="#e4dfcf"/>
+    <g fill="#c9c2ad">
+      <circle cx="154" cy="146" r="7"/>
+      <circle cx="154" cy="206" r="7"/>
+      <circle cx="154" cy="266" r="7"/>
+      <circle cx="154" cy="326" r="7"/>
+      <circle cx="154" cy="386" r="7"/>
+    </g>
+    <!-- route -->
+    <path d="M214 362 C 214 300, 330 318, 322 258 S 230 214, 262 168"
+          fill="none" stroke="#354f43" stroke-width="13" stroke-linecap="round"
+          stroke-dasharray="1 28"/>
+    <circle cx="214" cy="364" r="17" fill="#354f43"/>
+    <circle cx="214" cy="364" r="7" fill="#f6f3e9"/>
+    <!-- pin -->
+    <path d="M296 196 c0-30 24-54 54-54 s54 24 54 54 c0 40-54 92-54 92 s-54-52-54-92z"
+          fill="#c17d58" transform="translate(-58 -40)"/>
+    <circle cx="292" cy="156" r="20" fill="#f6f3e9"/>
+  </g>
+</svg>

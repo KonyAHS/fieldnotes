@@ -1,9 +1,13 @@
+<p align="center"><img src="https://raw.githubusercontent.com/KonyAHS/fieldnotes/main/docs/assets/logo.svg" alt="Fieldnotes" width="96"></p>
+
 # Fieldnotes
 
 **A self-hosted, offline-first travel planner.** Plan trips on a calendar-style timeline, keep alternative versions of an itinerary, compare transport, find restaurants and trails nearby, attach tickets, and print visa schedules. It runs as a single small container with SQLite and needs no cloud account or paid map API.
 
 - Source, issues and full documentation: **https://github.com/KonyAHS/fieldnotes**
 - License: ISC
+
+![Fieldnotes itinerary timeline](https://raw.githubusercontent.com/KonyAHS/fieldnotes/main/docs/screenshots/itinerary.png)
 
 ## Features
 
