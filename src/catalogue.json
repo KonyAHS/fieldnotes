@@ -1,0 +1,86 @@
+[
+  {
+    "country": "Japan",
+    "city": "Tokyo",
+    "name": "Senso-ji Temple",
+    "notes": "Short walk from Asakusa Station\nGo early to avoid crowds",
+    "url": "https://www.senso-ji.jp/"
+  },
+  {
+    "country": "Japan",
+    "city": "Tokyo",
+    "name": "teamLab Planets",
+    "notes": "Near Shin-Toyosu Station\nTimed tickets; book ahead",
+    "url": "https://www.teamlab.art/e/planets/"
+  },
+  {
+    "country": "Japan",
+    "city": "Tokyo",
+    "name": "Meiji Jingu",
+    "notes": "Next to Harajuku Station\nFree entry",
+    "url": "https://www.meijijingu.or.jp/en/"
+  },
+  {
+    "country": "Japan",
+    "city": "Kyoto",
+    "name": "Fushimi Inari Taisha",
+    "notes": "Next to JR Inari Station\nOpen all day; the full hike takes 2–3 h",
+    "url": "https://inari.jp/en/"
+  },
+  {
+    "country": "Japan",
+    "city": "Kyoto",
+    "name": "Kinkaku-ji",
+    "notes": "Bus from Kyoto Station\nCheck opening hours",
+    "url": "https://www.shokoku-ji.jp/en/kinkakuji/"
+  },
+  {
+    "country": "Japan",
+    "city": "Nara",
+    "name": "Nara Park and Todai-ji",
+    "notes": "Easy day trip from Kyoto or Osaka\nTodai-ji has an entry fee",
+    "url": "https://www.todaiji.or.jp/en/"
+  },
+  {
+    "country": "Japan",
+    "city": "Osaka",
+    "name": "Osaka Castle",
+    "notes": "Walk from Osakajokoen Station\nMuseum inside the main tower",
+    "url": "https://www.osakacastle.net/english/"
+  },
+  {
+    "country": "Japan",
+    "city": "Fukuoka",
+    "name": "Ohori Park",
+    "notes": "Subway to Ohorikoen\nGood for an easy morning walk",
+    "url": ""
+  },
+  {
+    "country": "Korea",
+    "city": "Busan",
+    "name": "Gamcheon Culture Village",
+    "notes": "Bus from Toseong Station\nHilly; wear good shoes",
+    "url": ""
+  },
+  {
+    "country": "Korea",
+    "city": "Busan",
+    "name": "Haeundae Beach",
+    "notes": "Subway Line 2 to Haeundae",
+    "url": ""
+  },
+  {
+    "country": "Korea",
+    "city": "Seoul",
+    "name": "Gyeongbokgung Palace",
+    "notes": "Subway Line 3 to Gyeongbokgung\nClosed on Tuesdays",
+    "url": "https://royal.khs.go.kr/"
+  },
+  {
+    "country": "Korea",
+    "city": "Seoul",
+    "name": "Bukchon Hanok Village",
+    "notes": "Residential area; visiting hours apply",
+    "url": ""
+  }
+]

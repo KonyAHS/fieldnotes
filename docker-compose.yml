@@ -1,0 +1,25 @@
+services:
+  fieldnotes:
+    image: ${FIELDNOTES_IMAGE:-konyahs/fieldnotes:latest}
+    container_name: fieldnotes
+    environment:
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${FIELDNOTES_PORT:-3000}:3000"
+    volumes:
+      # Must be writable by UID 1000 (the image's "node" user).
+      - ${FIELDNOTES_DATA:-./data}:/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

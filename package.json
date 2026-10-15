@@ -1,0 +1,46 @@
+{
+  "name": "fieldnotes",
+  "version": "1.0.0",
+  "description": "Self-hosted, offline-first travel planner with itinerary scenarios, maps and visa schedule exports",
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "dev": "vite",
+    "server": "tsx server/index.ts",
+    "build": "tsc && vite build",
+    "start": "tsx server/index.ts",
+    "test:browser": "node scripts/browser-check.mjs",
+    "format": "prettier --write src server tests scripts/*.mjs vite.config.ts tsconfig.json package.json"
+  },
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "html-to-image": "^1.11.13",
+    "ical.js": "^2.2.1",
+    "imapflow": "^2.2.4",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.51.0",
+    "mailparser": "^3.9.34",
+    "pdfjs-dist": "^6.4.299",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/leaflet": "^1.9.22",
+    "@types/mailparser": "^3.9.0",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "prettier": "^3.9.9",
+    "sharp": "^0.35.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "private": true
+}
