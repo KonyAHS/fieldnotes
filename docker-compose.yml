@@ -1,6 +1,6 @@
 services:
   fieldnotes:
-    image: ${FIELDNOTES_IMAGE:-konyahs/fieldnotes:latest}
+    image: ${FIELDNOTES_IMAGE:-konyoshino/fieldnotes:latest}
     container_name: fieldnotes
     environment:
       TZ: ${TZ:-UTC}

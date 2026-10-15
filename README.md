@@ -83,7 +83,7 @@ Images are published for `linux/amd64` and `linux/arm64`:
 mkdir -p data && sudo chown 1000:1000 data
 docker run -d --name fieldnotes -p 3000:3000 \
   -v "$PWD/data:/data" --restart unless-stopped \
-  konyahs/fieldnotes:latest
+  konyoshino/fieldnotes:latest
 ```
 
 Or with Docker Compose, using the `docker-compose.yml` in this repository (copy `.env.example` to `.env` to change the image, port, data directory or time zone):
