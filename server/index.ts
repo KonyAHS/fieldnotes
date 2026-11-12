@@ -12,7 +12,7 @@ import {
 import { attachments, validId } from "./attachments.ts";
 import { seedWorkspace } from "../src/seed.ts";
 import { tripCalendar, calendarName } from "../src/calendar.ts";
-import { lookups } from "./lookup.ts";
+import { lookups, localLanguages } from "./lookup.ts";
 import { mailbox } from "./mailbox.ts";
 import { locator } from "./locator.ts";
 import { maps } from "./maps.ts";
@@ -198,6 +198,49 @@ const server = createServer(async (req, res) => {
       }
       return;
     }
+    if (url.pathname === "/api/local-name" && req.method === "GET") {
+      const cc = (url.searchParams.get("cc") || "").toLowerCase();
+      const name = (url.searchParams.get("name") || "").trim().slice(0, 300);
+      const gid = url.searchParams.get("gid") || "";
+      const [lat, lng] = (url.searchParams.get("near") || "")
+        .split(",")
+        .map(Number);
+      const near: [number, number] | undefined =
+        url.searchParams.has("near") &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        Math.abs(lat) <= 90 &&
+        Math.abs(lng) <= 180
+          ? [lat, lng]
+          : undefined;
+      if (
+        !localLanguages[cc] ||
+        (gid && !/^[\w-]{10,300}$/.test(gid)) ||
+        (!gid && (!name || !near))
+      ) {
+        json(400, { error: "Give a place ID, or a name and position" });
+        return;
+      }
+      if (!mapData.hasGoogle()) {
+        json(409, {
+          error: "Local names come from Google Maps; add a key in Settings",
+        });
+        return;
+      }
+      try {
+        json(200, {
+          result: await lookup.localName({
+            cc,
+            name,
+            googlePlaceId: gid || undefined,
+            near,
+          }),
+        });
+      } catch {
+        json(502, { error: "Google Maps is unavailable. Try again shortly." });
+      }
+      return;
+    }
     if (url.pathname === "/api/nearby" && req.method === "GET") {
       const lat = Number(url.searchParams.get("lat")),
         lng = Number(url.searchParams.get("lng")),
@@ -293,6 +336,60 @@ const server = createServer(async (req, res) => {
         json(200, { path: await lookup.railPath(from, to) });
       } catch {
         json(502, { error: "Rail routing unavailable" });
+      }
+      return;
+    }
+    if (url.pathname === "/api/transit" && req.method === "GET") {
+      const point = (name: string) => {
+        const [lat, lng] = (url.searchParams.get(name) || "")
+          .split(",")
+          .map(Number);
+        return Number.isFinite(lat) &&
+          Number.isFinite(lng) &&
+          Math.abs(lat) <= 90 &&
+          Math.abs(lng) <= 180
+          ? ([lat, lng] as [number, number])
+          : null;
+      };
+      const from = point("from"),
+        to = point("to");
+      const by = url.searchParams.has("arrive") ? "arrive" : "depart";
+      const time = Date.parse(url.searchParams.get(by) || "");
+      if (
+        !from ||
+        !to ||
+        !Number.isFinite(time) ||
+        Math.abs(time - Date.now()) > 3 * 365 * 86400000
+      ) {
+        json(400, { error: "Invalid request" });
+        return;
+      }
+      if (!mapData.hasGoogle()) {
+        json(409, {
+          error:
+            "Add a Google Maps API key in Settings to look up public transport.",
+          code: "nokey",
+        });
+        return;
+      }
+      try {
+        // Whole minutes, so equivalent requests share one cache entry.
+        const at = new Date(Math.round(time / 60000) * 60000).toISOString();
+        json(200, await lookup.transitOrSample(from, to, { by, at }));
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Transit directions unavailable";
+        // The key works for Places but the Routes API is not turned on.
+        const off =
+          /Routes API has not been used|SERVICE_DISABLED|API_KEY_SERVICE_BLOCKED|not authorized to use this API/i.test(
+            message,
+          );
+        json(502, {
+          error: off
+            ? "Turn on the Routes API for your Google Maps key to look up public transport."
+            : message,
+          code: off ? "disabled" : "",
+        });
       }
       return;
     }

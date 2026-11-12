@@ -38,6 +38,7 @@ import {
   entriesOn,
   isWeekend,
   mondayOf,
+  deviceToday,
   shiftStay,
   bookingState,
   bookingLabel,
@@ -306,6 +307,7 @@ export function Timeline({
   context,
   exporting = false,
   only,
+  onDay,
 }: {
   trip: Trip;
   scenario: Scenario;
@@ -327,6 +329,8 @@ export function Timeline({
   exporting?: boolean;
   /** Exact days to show, for exporting one week at a time. */
   only?: [string, string];
+  /** Opens a day's map. */
+  onDay?: (date: string) => void;
 }) {
   const [chosenRange, setRange] = useState<"week" | "trip">(() =>
     localStorage.getItem("fieldnotes-range") === "trip" ? "trip" : "week",
@@ -616,6 +620,44 @@ export function Timeline({
     const m = Math.round(h * 60);
     return `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   };
+  // During the trip the timeline opens at today's column and the current
+  // time; the Now button goes back there.
+  const scroller = useRef<HTMLDivElement>(null);
+  const nowLine = useRef<HTMLDivElement>(null);
+  const showsToday = !exporting && !only && visible.includes(now.date);
+  function goToNow(smooth = false) {
+    const box = scroller.current;
+    const header = box?.querySelector<HTMLElement>(`[data-day="${now.date}"]`);
+    if (!box || !header) return;
+    const behavior = smooth ? "smooth" : "instant";
+    // Leave the hour labels and a little of the day before in view.
+    const left =
+      header.getBoundingClientRect().left -
+      box.getBoundingClientRect().left +
+      box.scrollLeft -
+      62 -
+      Math.min(40, box.clientWidth * 0.08);
+    box.scrollTo({ left: Math.max(0, left), behavior });
+    const target = nowLine.current || header;
+    const at = target.getBoundingClientRect().top;
+    if (expanded) {
+      const top = box.getBoundingClientRect().top;
+      box.scrollBy({ top: at - top - box.clientHeight * 0.35, behavior });
+    } else if (at < innerHeight * 0.2 || at > innerHeight * 0.8) {
+      window.scrollBy({ top: at - innerHeight * 0.4, behavior });
+    }
+  }
+  const scrolledTo = useRef("");
+  useEffect(() => {
+    const key = `${trip.id}|${range}|${now.date}`;
+    if (!showsToday || scrolledTo.current === key) return;
+    scrolledTo.current = key;
+    // After the layout has settled (hour heights depend on measured chrome).
+    const frame = requestAnimationFrame(() =>
+      requestAnimationFrame(() => goToNow()),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [showsToday, trip.id, range, now.date]);
   function landingAt(e: React.DragEvent<HTMLElement>, date: string) {
     if (!moving) return null;
     const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
@@ -806,6 +848,24 @@ export function Timeline({
           </button>
         </div>
         <div className="timeline-controls">
+          {(showsToday ||
+            (!exporting &&
+              now.date >= trip.start &&
+              now.date <= trip.end)) && (
+            <button
+              className="text-button"
+              title="Show today and the current time"
+              onClick={() => {
+                if (showsToday) goToNow(true);
+                else {
+                  scrolledTo.current = "";
+                  setStart(now.date);
+                }
+              }}
+            >
+              Now
+            </button>
+          )}
           <input
             aria-label="Jump to date"
             type="date"
@@ -866,7 +926,7 @@ export function Timeline({
           </div>
         </div>
       </div>
-      <div className="timeline-scroll">
+      <div className="timeline-scroll" ref={scroller}>
         <div
           className={`timeline-grid ${column < 100 ? "narrow" : ""}`}
           style={{ minWidth: gridWidth }}
@@ -937,7 +997,19 @@ export function Timeline({
                         <Plus size={14} />
                       </button>
                     </div>
-                    <strong>{shortDate(d)}</strong>
+                    <strong>
+                      {onDay && !exporting ? (
+                        <button
+                          className="day-map-open"
+                          onClick={() => onDay(d)}
+                          title="Show this day's map and public transport"
+                        >
+                          {shortDate(d)}
+                        </button>
+                      ) : (
+                        shortDate(d)
+                      )}
+                    </strong>
                     <div className="day-city">
                       {location?.city || "Unplanned"}
                       {location?.country && (
@@ -1301,6 +1373,7 @@ export function Timeline({
                 {!exporting && d === now.date && now.hour >= firstHour && (
                   <div
                     className="now-line"
+                    ref={nowLine}
                     style={{ top: y(now.hour) }}
                     title={`Now ${clock(now.hour)}`}
                   />
@@ -1344,6 +1417,7 @@ export function Agenda({
   weekHeadings,
   places,
   context,
+  onDay,
 }: {
   trip: Trip;
   scenario: Scenario;
@@ -1358,6 +1432,8 @@ export function Agenda({
   places?: Place[];
   /** The unfiltered plan, so hidden hotels still say where each day is. */
   context?: Scenario;
+  /** Opens a day's map. */
+  onDay?: (date: string) => void;
 }) {
   // Numbered Monday-to-Sunday weeks, as on the timeline.
   const weeks =
@@ -1380,8 +1456,43 @@ export function Agenda({
       (Date.parse(mondayOf(d)) - Date.parse(mondayOf(trip.start))) /
         (7 * 86400000),
     ) + 1;
+  const sorted = (d: string) =>
+    entriesOn(scenario, d).sort(
+      (a, b) =>
+        (a.type === "stay" ? -1 : 0) - (b.type === "stay" ? -1 : 0) ||
+        a.startTime.localeCompare(b.startTime),
+    );
+  // During the trip the list opens at what is on now (or next) today.
+  const box = useRef<HTMLDivElement>(null);
+  const today = deviceToday();
+  useEffect(() => {
+    if (exporting || only || !all.includes(today)) return;
+    const day = box.current?.querySelector<HTMLElement>(
+      `[data-day="${today}"]`,
+    );
+    if (!day) return;
+    const t = new Date();
+    const clock = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+    const list = sorted(today);
+    const index = list.findIndex(
+      (e) =>
+        e.type !== "stay" &&
+        !e.allDay &&
+        (e.endDate > today || e.endTime > clock || e.startTime >= clock),
+    );
+    const entry =
+      index >= 0
+        ? day.querySelector(`.agenda-entries > :nth-child(${index + 1})`)
+        : null;
+    // Wait a frame so the page has its final height before scrolling.
+    requestAnimationFrame(() =>
+      entry && index > 1
+        ? entry.scrollIntoView({ block: "center" })
+        : day.scrollIntoView({ block: "start" }),
+    );
+  }, [exporting, today, trip.id]);
   return (
-    <div className={`agenda ${exporting ? "exporting" : ""}`}>
+    <div className={`agenda ${exporting ? "exporting" : ""}`} ref={box}>
       {all.map((d, i) => (
         <Fragment key={d}>
           {weeks && (i === 0 || mondayOf(d) === d) && (
@@ -1393,10 +1504,25 @@ export function Agenda({
               </span>
             </div>
           )}
-          <section className={`agenda-day ${isWeekend(d) ? "weekend" : ""}`}>
+          <section
+            className={`agenda-day ${isWeekend(d) ? "weekend" : ""} ${d === today && !exporting ? "today" : ""}`}
+            data-day={d}
+          >
             <div className="agenda-date">
               <span>{weekday(d)}</span>
-              <strong>{shortDate(d)}</strong>
+              <strong>
+                {onDay && !exporting ? (
+                  <button
+                    className="day-map-open"
+                    onClick={() => onDay(d)}
+                    title="Show this day's map and public transport"
+                  >
+                    {shortDate(d)}
+                  </button>
+                ) : (
+                  shortDate(d)
+                )}
+              </strong>
               {weather[i] && (
                 <WeatherBadge weather={weather[i]!} rain={false} />
               )}
@@ -1409,13 +1535,7 @@ export function Agenda({
               </button>
             </div>
             <div className="agenda-entries">
-              {entriesOn(scenario, d)
-                .sort(
-                  (a, b) =>
-                    (a.type === "stay" ? -1 : 0) -
-                      (b.type === "stay" ? -1 : 0) ||
-                    a.startTime.localeCompare(b.startTime),
-                )
+              {sorted(d)
                 .map((e) =>
                   e.type === "stay" ? (
                     <button

@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   lazy,
   Suspense,
@@ -80,6 +81,7 @@ import {
   safeUrl,
   type Kind,
   kindOf,
+  deviceToday,
 } from "./model";
 import {
   EntryEditor,
@@ -119,6 +121,9 @@ const Food = lazy(() =>
 );
 const Outdoors = lazy(() =>
   import("./components/Outdoors").then((m) => ({ default: m.Outdoors })),
+);
+const DayMap = lazy(() =>
+  import("./components/DayMap").then((m) => ({ default: m.DayMap })),
 );
 const ShareImage = lazy(() =>
   import("./components/Share").then((m) => ({ default: m.ShareImage })),
@@ -393,6 +398,7 @@ export default function App() {
   const [editor, setEditor] = useState<Editor>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [dayMap, setDayMap] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [mapsList, setMapsList] = useState(false);
   const [theme, setTheme] = useState(
@@ -450,6 +456,7 @@ export default function App() {
     };
     window.addEventListener("beforeinstallprompt", before);
     let mounted = true;
+    let visible = () => {};
     if ("serviceWorker" in navigator && !import.meta.env.DEV) {
       void navigator.serviceWorker
         .register("/sw.js")
@@ -469,6 +476,13 @@ export default function App() {
           void navigator.serviceWorker.ready.then(() => {
             if (mounted) setOfflineReady(true);
           });
+          // The app opens from its saved copy, so look for a new version
+          // whenever it comes back to the screen.
+          visible = () => {
+            if (document.visibilityState === "visible")
+              void reg.update().catch(() => {});
+          };
+          document.addEventListener("visibilitychange", visible);
         })
         .catch(() => {});
     }
@@ -480,6 +494,7 @@ export default function App() {
     navigator.serviceWorker?.addEventListener("controllerchange", controller);
     return () => {
       mounted = false;
+      document.removeEventListener("visibilitychange", visible);
       window.removeEventListener("beforeinstallprompt", before);
       navigator.serviceWorker?.removeEventListener(
         "controllerchange",
@@ -487,6 +502,20 @@ export default function App() {
       );
     };
   }, []);
+  // A waiting update is applied when the app is put away (edits are already
+  // saved on the device), so the next time it opens it is current.
+  useEffect(() => {
+    if (!update) return;
+    const away = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        !document.querySelector("dialog[open]")
+      )
+        update.postMessage("ACTIVATE_UPDATE");
+    };
+    document.addEventListener("visibilitychange", away);
+    return () => document.removeEventListener("visibilitychange", away);
+  }, [update]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("fieldnotes-theme", theme);
@@ -496,9 +525,19 @@ export default function App() {
   const scenario =
     trip?.scenarios.find((s) => s.id === trip.activeScenarioId) ||
     trip?.scenarios[0];
+  // During the trip the itinerary opens on today's week, and phones open on
+  // the Today page (once per launch, so switching tabs is left alone).
+  const landed = useRef(false);
   useEffect(() => {
-    if (trip) setStart(trip.start);
-  }, [trip?.id, trip?.start]);
+    if (!trip) return;
+    const today = deviceToday();
+    const during = today >= trip.start && today <= trip.end;
+    setStart(during ? today : trip.start);
+    if (!landed.current) {
+      landed.current = true;
+      if (during && window.innerWidth < 700) setTab("today");
+    }
+  }, [trip?.id, trip?.start, trip?.end]);
   // The itinerary without the kinds of plans hidden above. The timeline keeps
   // hidden stays (they name each day's city) and just leaves out their row.
   const shown = useMemo(() => {
@@ -1107,6 +1146,7 @@ export default function App() {
                   onAdd={add}
                   onIssue={fixIssue}
                   onMove={move}
+                  onDay={setDayMap}
                   places={data.places}
                   onStayChange={(id, date, endDate) =>
                     mutate((d) => {
@@ -1132,6 +1172,7 @@ export default function App() {
                   places={data.places}
                   onEdit={edit}
                   onAdd={add}
+                  onDay={setDayMap}
                 />
               )}
             </>
@@ -1552,6 +1593,16 @@ export default function App() {
             </button>
           </div>
         </Modal>
+      )}
+      {dayMap && scenario && (
+        <Suspense fallback={null}>
+          <DayMap
+            scenario={scenario}
+            places={data.places}
+            date={dayMap}
+            onClose={() => setDayMap(null)}
+          />
+        </Suspense>
       )}
       {sharing && trip && scenario && (
         <Suspense fallback={null}>

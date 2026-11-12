@@ -21,6 +21,7 @@ import {
   weekday,
   distance,
   mapLinks,
+  openLocalMap,
   emptyPlace,
   isWeekend,
 } from "../model";
@@ -72,7 +73,13 @@ const aliases: Record<string, string> = {
   café: "cafe",
   noodles: "noodle",
 };
-const generic = new Set(["restaurant", "food", "establishment", "point of interest", ""]);
+const generic = new Set([
+  "restaurant",
+  "food",
+  "establishment",
+  "point of interest",
+  "",
+]);
 function cuisinesOf(r: FoodResult) {
   const found = r.cuisine
     .split(/[,;]/)
@@ -480,6 +487,10 @@ export function Food({
                     href={mapLinks(place, true)[0].url}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(ev) => {
+                      const l = mapLinks(place, true)[0];
+                      openLocalMap(ev, l.url, l.app);
+                    }}
                   >
                     {mapLinks(place, true)[0].name}
                     <ExternalLink size={13} />
@@ -675,6 +686,10 @@ export function Food({
                         href={mapLinks(asPlace(r))[0].url}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={(ev) => {
+                          const l = mapLinks(asPlace(r))[0];
+                          openLocalMap(ev, l.url, l.app);
+                        }}
                       >
                         <Navigation size={15} />
                       </a>

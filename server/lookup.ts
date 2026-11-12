@@ -6,7 +6,46 @@ const day = 86400000;
 import type { GeoResult } from "../src/locate.ts";
 import type { maps as mapsFactory } from "./maps.ts";
 import { type Point, km, simplify } from "../src/tripRoute.ts";
+import type { TransitRoute, TransitWhen } from "../src/dayRoute.ts";
 export type { GeoResult };
+export type LocalName = {
+  name: string;
+  address: string;
+  googlePlaceId: string;
+};
+// Google's language for each country code ("hk" gives traditional Chinese).
+export const localLanguages: Record<string, string> = {
+  cn: "zh-CN",
+  hk: "zh-HK",
+  mo: "zh-HK",
+  tw: "zh-TW",
+  jp: "ja",
+  kr: "ko",
+};
+// Local script: Chinese characters, kana, Hangul.
+const localScript = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]/;
+// Leaves out the country name, postcodes and plus codes, which drivers
+// don't need. Google's mainland China addresses are often a mix of English,
+// plus codes and repeated regions; those that still contain English words,
+// name Macau (Zhuhai stations do), or are only a district are dropped.
+export function tidyAddress(a: string, cc = "") {
+  let t = a
+    .replace(/[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}/g, " ")
+    .replace(/(^|\s)CN(\s|$)/g, " ")
+    .replace(/中国\s*\d{6}$/, "")
+    .replace(/^(中国|中國|日本|대한민국|Japan|China)[、,，\s]*/, "")
+    .replace(/^〒?\d{3}-\d{4}\s*/, "")
+    .replace(/\s*邮政编码[:：]\s*\d+$/, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,，]+|[\s,，]+$/g, "")
+    .trim();
+  if (
+    cc === "cn" &&
+    (/[A-Za-z]{3,}/.test(t) || /澳门|澳門/.test(t) || t.length < 8)
+  )
+    t = "";
+  return localScript.test(t) ? t : "";
+}
 export type FoodResult = {
   id: string;
   name: string;
@@ -87,12 +126,20 @@ export function lookups(
   db.exec(
     "CREATE TABLE IF NOT EXISTS lookup_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, created_at INTEGER NOT NULL)",
   );
-  async function cached<T>(key: string, ttl: number, load: () => Promise<T>) {
+  // `ttl` may depend on the cached value (Infinity keeps it for good).
+  async function cached<T>(
+    key: string,
+    ttl: number | ((value: T) => number),
+    load: () => Promise<T>,
+  ) {
     const row = db
       .prepare("SELECT value, created_at FROM lookup_cache WHERE key=?")
       .get(key) as { value: string; created_at: number } | undefined;
-    if (row && Date.now() - row.created_at < ttl)
-      return JSON.parse(row.value) as T;
+    if (row) {
+      const value = JSON.parse(row.value) as T;
+      const keep = typeof ttl === "function" ? ttl(value) : ttl;
+      if (Date.now() - row.created_at < keep) return value;
+    }
     const value = await load();
     db.prepare("INSERT OR REPLACE INTO lookup_cache VALUES (?, ?, ?)").run(
       key,
@@ -617,6 +664,53 @@ export function lookups(
       );
     });
   }
+  // Public transport between two points for a planned departure or arrival,
+  // from Google. A found route is kept for good (the same request is never
+  // repeated); "no route" is retried after a week, since Google publishes
+  // timetables only some weeks ahead.
+  const transitPending = new Map<string, Promise<TransitRoute>>();
+  function transit(from: Point, to: Point, when: TransitWhen) {
+    const f = (p: Point) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`;
+    const key = `transit1:${f(from)}:${f(to)}:${when.by}:${when.at}`;
+    let pending = transitPending.get(key);
+    if (!pending) {
+      pending = cached<TransitRoute>(
+        key,
+        (r) => (r.found ? Infinity : 7 * day),
+        () => maps.transit(from, to, when),
+      ).finally(() => transitPending.delete(key));
+      transitPending.set(key, pending);
+    }
+    return pending;
+  }
+  // Google only has timetables a few weeks ahead (and 7 days back). With no
+  // route on the trip's date, the same weekday and time this coming week is
+  // used, then last week's, as a sample of the usual service. The combined
+  // answer is kept for a week, after which the real date is tried again.
+  const week = 7 * day;
+  function transitOrSample(from: Point, to: Point, when: TransitWhen) {
+    const f = (p: Point) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`;
+    const key = `transit1s:${f(from)}:${f(to)}:${when.by}:${when.at}`;
+    return cached<TransitRoute>(
+      key,
+      (r) => (r.found && !r.sample ? Infinity : week),
+      async () => {
+        const exact = await transit(from, to, when);
+        if (exact.found) return exact;
+        const at = Date.parse(when.at);
+        // The first occurrence at least an hour from now.
+        const soon = Date.now() + 3600000;
+        const next = at + Math.ceil((soon - at) / week) * week;
+        for (const t of [next, next - week]) {
+          if (t === at || t < Date.now() - week + 3600000) continue;
+          const sample = new Date(t).toISOString();
+          const r = await transit(from, to, { by: when.by, at: sample });
+          if (r.found) return { ...r, sample };
+        }
+        return exact;
+      },
+    );
+  }
   // Exchange rates for comparing prices: units of each currency per 1 base.
   async function rates(base: string) {
     return cached(`rates:${base}`, 12 * 3600000, async () => {
@@ -634,13 +728,60 @@ export function lookups(
       };
     });
   }
+  // A place's name and address in the local language and script (Google
+  // Places), for showing taxi drivers and searching local apps. By Google
+  // place ID when known, else by name near the saved position: a result is
+  // only used within 400 m of it.
+  async function localName(q: {
+    cc: string;
+    name: string;
+    googlePlaceId?: string;
+    near?: Point;
+  }): Promise<LocalName | null> {
+    const lang = localLanguages[q.cc];
+    if (!lang) throw Error("No local language for this country");
+    if (!maps.hasGoogle()) throw Error("Needs a Google Maps API key");
+    const key = q.googlePlaceId
+      ? `local2:${lang}:${q.googlePlaceId}`
+      : `local2:${lang}:${q.near ? q.near.map((n) => n.toFixed(4)).join(",") : ""}:${q.name.toLowerCase()}`;
+    return cached(
+      key,
+      (v: LocalName | null) => (v ? 90 * day : 7 * day),
+      async () => {
+        let hit: GeoResult | undefined;
+        if (q.googlePlaceId) hit = await maps.details(q.googlePlaceId, lang);
+        else {
+          const found = await maps.search({
+            textQuery: q.name,
+            regionCode: q.cc,
+            languageCode: lang,
+            bias: q.near && { lat: q.near[0], lng: q.near[1], radius: 2000 },
+          });
+          hit = found.find((r) => !q.near || km(q.near, [r.lat, r.lng]) <= 0.4);
+        }
+        if (!hit) return null;
+        // Google gives the English name when it has no local one.
+        const name = localScript.test(hit.name) ? hit.name : "";
+        const address = tidyAddress(hit.address, q.cc);
+        if (!name && !address) return null;
+        return {
+          name,
+          address,
+          googlePlaceId: hit.sourceId || q.googlePlaceId || "",
+        };
+      },
+    );
+  }
   return {
+    localName,
     geocode,
     reverse,
     nearby,
     outdoors,
     routeShape,
     railPath,
+    transit,
+    transitOrSample,
     weather,
     rates,
   };

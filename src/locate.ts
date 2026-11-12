@@ -37,7 +37,10 @@ export const placeSignature = (p: Place) =>
   [p.name, p.nativeName, p.city, p.country, p.address, p.nativeAddress]
     .map((v) => v.trim().toLowerCase())
     .join("|");
-export const needsLocation = (p: Place) => p.lat === null && !p.geo;
+// Also places marked as located that lost their position (an edit or an
+// import that cleared it), which would otherwise never be located again.
+export const needsLocation = (p: Place) =>
+  p.lat === null && (!p.geo || p.geo === "auto" || p.geo === "approx");
 // Try the most specific description first, then fall back to the city so a
 // place always gets a usable search anchor. Name matches must lie near the
 // city (fuzzy search can ignore it), so a similarly named place elsewhere in

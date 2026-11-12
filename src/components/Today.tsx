@@ -10,6 +10,7 @@ import {
   Copy,
   Check,
   Compass,
+  MapPin,
 } from "lucide-react";
 import {
   type Trip,
@@ -23,21 +24,20 @@ import {
   instant,
   shortDate,
   weekday,
-  mapLinks,
+  placeMaps,
   phoneLink,
   webLink,
   countryMeta,
+  deviceToday,
+  bookingState,
+  openLocalMap,
 } from "../model";
 import { prayerTimes, qibla } from "../prayer";
 import { useWhereabouts, useWeather, weatherKind } from "../whereabouts";
 import { WeatherBadge } from "./WeatherBadge";
-import { EntryIcon } from "./Timeline";
+import { EntryIcon, BookingTag } from "./Timeline";
 import { AttachmentViewer } from "./Attachments";
-// The device's calendar date; abroad the phone uses local time.
-const localToday = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
+import { DriverButton, LocalName } from "./LocalName";
 const clock = (h: number) => {
   const m = Math.round(h * 60);
   return `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -48,21 +48,6 @@ const until = (ms: number) => {
   const h = Math.floor(m / 60);
   return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
 };
-// Directions to a place: Google Maps by position when known, and the local
-// map app in Korea and China, where Google is incomplete.
-function directions(place: Place) {
-  const google =
-    place.lat !== null && place.lng !== null
-      ? `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`
-      : mapLinks(place)
-          .filter((l) => l.name === "Google Maps")
-          .map((l) => l.url)[0];
-  const local =
-    place.country === "Korea" || place.country === "China"
-      ? mapLinks(place)[0]
-      : null;
-  return { google, local };
-}
 function CopyRef({ text }: { text: string }) {
   const [done, setDone] = useState(false);
   return (
@@ -90,31 +75,68 @@ function Actions({
   place: Place | undefined;
   onOpen: (a: Attachment) => void;
 }) {
+  // A hotel or plan's place, or where a journey ends; not for flights and
+  // trains, which a driver doesn't take you on.
+  const driveTo =
+    entry.type === "transport" && entry.scope === "intercity"
+      ? undefined
+      : place;
   const phone = entry.phone?.trim() || place?.phone || "";
   const link = entry.ticketUrl?.trim();
-  const ways = place && directions(place);
+  const maps = place && placeMaps(place);
   return (
     <div className="today-actions">
-      {ways?.google && (
-        <a
-          className="today-chip"
-          href={ways.google}
-          target="_blank"
-          rel="noreferrer"
-        >
+      {maps && (
+        <span className="today-map-pair" aria-label="Directions">
           <Navigation size={13} /> Directions
-        </a>
+          <a href={maps.googleWay} target="_blank" rel="noreferrer">
+            Google
+          </a>
+          <a href={maps.appleWay} target="_blank" rel="noreferrer">
+            Apple
+          </a>
+          {maps.local
+            .filter((l) => l.way)
+            .map((l) => (
+              <a
+                key={l.name}
+                href={l.way}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(ev) => openLocalMap(ev, l.way!, l.wayApp)}
+              >
+                {l.name}
+              </a>
+            ))}
+        </span>
       )}
-      {ways?.local && (
-        <a
-          className="today-chip"
-          href={ways.local.url}
-          target="_blank"
-          rel="noreferrer"
+      {maps && (
+        <span
+          className="today-map-pair"
+          aria-label="Open the place in a map app"
+          title="Open the place's own page in the map app"
         >
-          <Navigation size={13} /> {ways.local.name}
-        </a>
+          <MapPin size={13} /> Place
+          <a href={maps.google} target="_blank" rel="noreferrer">
+            Google
+          </a>
+          <a href={maps.apple} target="_blank" rel="noreferrer">
+            Apple
+          </a>
+          {maps.local.map((l) => (
+            <a
+              key={l.name}
+              href={l.place}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(ev) => openLocalMap(ev, l.place, l.app)}
+            >
+              {l.name}
+            </a>
+          ))}
+        </span>
       )}
+      <DriverButton place={driveTo} />
       {phone && (
         <a className="today-chip" href={phoneLink(phone)}>
           <Phone size={13} /> Call
@@ -152,7 +174,7 @@ export function Today({
   places: Place[];
   onEdit: (e: Entry) => void;
 }) {
-  const today = localToday();
+  const today = deviceToday();
   const during = today >= trip.start && today <= trip.end;
   const [date, setDate] = useState(() =>
     during ? today : today < trip.start ? trip.start : trip.end,
@@ -168,6 +190,15 @@ export function Today({
   const all = days(trip.start, trip.end);
   const index = all.indexOf(date);
   const placeOf = (e: Entry) => places.find((p) => p.id === e.placeId);
+  // Times as on the itinerary's cards.
+  const timeOf = (e: Entry) =>
+    e.allDay
+      ? "All day"
+      : date > e.date
+        ? date === e.endDate
+          ? `Arrives ${e.endTime}`
+          : "In transit"
+        : e.startTime + (e.endDate === e.date ? `–${e.endTime}` : " →");
   const plans = entriesOn(scenario, date)
     .filter((e) => e.type !== "stay")
     .sort(
@@ -194,6 +225,24 @@ export function Today({
     ? plans.find((e) => !e.allDay && startOf(e) > now)
     : undefined;
   const stay = where?.stay || null;
+  // Where a journey starts: the last earlier plan's place that day, else
+  // the hotel slept in.
+  const slept = scenario.entries.find(
+    (e) =>
+      e.type === "stay" &&
+      e.status !== "idea" &&
+      e.date < date &&
+      e.endDate >= date,
+  );
+  const originOf = (e: Entry) => {
+    const i = plans.indexOf(e);
+    for (let j = i - 1; j >= 0; j--) {
+      const p = placeOf(plans[j]);
+      if (p && p.id !== e.placeId && plans[j].date === date) return p;
+    }
+    const hotelBefore = e.date === date && slept ? placeOf(slept) : undefined;
+    return hotelBefore?.id !== e.placeId ? hotelBefore : undefined;
+  };
   const checkout = scenario.entries.find(
     (e) => e.type === "stay" && e.endDate === date && e.id !== stay?.id,
   );
@@ -323,15 +372,13 @@ export function Today({
               </button>
               {hotel && (hotel.nativeAddress || hotel.address) && (
                 <p className="today-address">
-                  {hotel.nativeName && hotel.nativeName !== hotel.name && (
-                    <strong lang="und">{hotel.nativeName}</strong>
-                  )}
-                  <span lang="und">{hotel.nativeAddress || hotel.address}</span>
                   {hotel.nativeAddress && hotel.address && (
                     <small>{hotel.address}</small>
                   )}
+                  {!hotel.nativeAddress && <span>{hotel.address}</span>}
                 </p>
               )}
+              {hotel && <LocalName place={hotel} />}
               <Actions entry={stay} place={hotel} onOpen={setViewing} />
             </>
           )}
@@ -345,55 +392,64 @@ export function Today({
           const isNow = e === current;
           const isNext = e === next;
           const done = live && !e.allDay && endOf(e) <= now;
+          const booking = bookingState(e);
+          const route =
+            e.toCity && e.toCity !== e.city ? `${e.city} → ${e.toCity}` : "";
           return (
             <article
               key={e.id}
-              className={`today-plan kind-${e.type} ${isNow ? "now" : ""} ${isNext ? "next" : ""} ${done ? "done" : ""}`}
+              className={`today-plan event-card event-${e.type} ${e.status === "idea" ? "idea" : ""} ${booking ? `booking-${booking}` : ""} ${isNow ? "now" : ""} ${isNext ? "next" : ""} ${done ? "done" : ""}`}
             >
-              <div className="today-time">
-                {e.allDay ? (
-                  "All day"
-                ) : (
-                  <>
-                    <strong>{e.date === date ? e.startTime : "…"}</strong>
-                    {e.endDate === date && e.endTime !== e.startTime && (
-                      <span>{e.endTime}</span>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="today-body">
-                {(isNow || isNext) && (
-                  <span className="today-badge">
-                    {isNow ? "Now" : `Next · in ${until(startOf(e) - now)}`}
-                  </span>
-                )}
-                <button className="today-title" onClick={() => onEdit(e)}>
-                  <EntryIcon type={e.type} size={16} />
-                  <span>{e.title}</span>
-                </button>
-                {e.type === "transport" && (
-                  <p className="today-meta">
-                    {[
-                      e.toCity && e.toCity !== e.city
-                        ? `${e.city} → ${e.toCity}`
-                        : "",
-                      e.mode,
-                      e.provider,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                )}
-                {place && (
-                  <p className="today-meta">
+              {booking && <BookingTag state={booking} />}
+              <button className="today-plan-head" onClick={() => onEdit(e)}>
+                <span className="event-top">
+                  <EntryIcon type={e.type} />
+                  <span>{timeOf(e)}</span>
+                  {(isNow || isNext) && (
+                    <span className="today-badge">
+                      {isNow ? "Now" : `Next · in ${until(startOf(e) - now)}`}
+                    </span>
+                  )}
+                  {!!e.attachments?.length && (
+                    <Paperclip
+                      size={12}
+                      aria-label={`${e.attachments.length} attachments`}
+                    />
+                  )}
+                </span>
+                <strong>{e.title}</strong>
+              </button>
+              {e.type === "transport" && (route || e.mode || e.provider) && (
+                <span className="event-route">
+                  {[route, e.mode, e.provider].filter(Boolean).join(" · ")}
+                </span>
+              )}
+              {place && (
+                <span className="event-route">
+                  <MapPin size={12} />
+                  <span>
                     {[
                       ...new Set([place.name, place.address].filter(Boolean)),
                     ].join(" · ")}
-                  </p>
-                )}
-                <Actions entry={e} place={place} onOpen={setViewing} />
-              </div>
+                  </span>
+                </span>
+              )}
+              {e.type === "transport" &&
+              e.scope === "local" &&
+              originOf(e) &&
+              place ? (
+                <div className="local-route">
+                  <LocalName
+                    place={originOf(e)!}
+                    label="From"
+                    address={false}
+                  />
+                  <LocalName place={place} label="To" />
+                </div>
+              ) : (
+                place && <LocalName place={place} />
+              )}
+              <Actions entry={e} place={place} onOpen={setViewing} />
             </article>
           );
         })}

@@ -24,6 +24,7 @@ import {
 import { countryCode } from "../src/locate.ts";
 import type { GeoResult } from "../src/locate.ts";
 import type { FoodResult } from "./lookup.ts";
+import { viaLabel, viaStops } from "../src/via.ts";
 
 export type Store = {
   read(): { revision: number; data: Workspace };
@@ -112,6 +113,13 @@ const entryFields = {
     .max(300)
     .optional()
     .describe('Transport operator and service, e.g. "JR Nozomi 21".'),
+  via: z
+    .array(z.string().max(300))
+    .max(12)
+    .optional()
+    .describe(
+      'Transport between cities: stops on the way, in order, as airport codes or places with optional times, e.g. ["DXB 10:55–12:55", "CMB 18:45–20:30"]. ["direct"] for none. Omit to read them from the title and notes (and assume the hub of hub airlines such as Emirates).',
+    ),
   option: z
     .string()
     .max(300)
@@ -157,6 +165,13 @@ const placeFields = {
     .max(300)
     .optional()
     .describe("Name in the local script."),
+  nativeReading: z
+    .string()
+    .max(300)
+    .optional()
+    .describe(
+      "Pronunciation of nativeName: pinyin (China), Jyutping (Hong Kong), romaji (Japan) or romanized Korean. Leave unset for Chinese and kana/Hangul names; it is worked out automatically.",
+    ),
   kind: z
     .enum(["attraction", "restaurant", "hotel", "station", "other"])
     .optional(),
@@ -184,6 +199,20 @@ const placeFields = {
     .optional()
     .describe("Source for the halal status or details, e.g. a link."),
   notes: z.string().max(20000).optional(),
+  googlePlaceId: z
+    .string()
+    .regex(/^[\w-]{10,300}$/)
+    .optional()
+    .describe(
+      "Google Maps place ID (find_place returns it as sourceId with Google), so links open the place's own Google Maps entry.",
+    ),
+  applePlaceId: z
+    .string()
+    .regex(/^([A-Z][0-9A-Z]{7,40}|auid:\d{3,30})$/)
+    .optional()
+    .describe(
+      "Apple Maps place ID (place-id=I… in an Apple Maps link), so links open the place's own Apple Maps entry.",
+    ),
 };
 const taskFields = {
   title: z.string().min(1).max(300),
@@ -274,6 +303,10 @@ const brief = (e: Entry, places: Place[]) => {
         : undefined,
     mode: e.type === "transport" ? e.mode : undefined,
     provider: e.provider,
+    via:
+      e.type === "transport" && viaStops(e).length
+        ? viaStops(e).map(viaLabel)
+        : undefined,
     option: e.option,
     status: e.status,
     reservation:
@@ -299,6 +332,7 @@ const placeBrief = (p: Place) =>
     id: p.id,
     name: p.name,
     nativeName: p.nativeName,
+    nativeReading: p.nativeReading,
     kind: p.kind,
     city: p.city,
     country: p.country,
@@ -312,6 +346,8 @@ const placeBrief = (p: Place) =>
           : "pending",
     url: p.url,
     phone: p.phone,
+    googlePlaceId: p.googlePlaceId,
+    applePlaceId: p.applePlaceId,
     notes: p.notes,
   });
 // Drop empty values to keep responses short.
@@ -337,6 +373,7 @@ function applyEntry(e: Entry, a: Record<string, any>, w: Workspace) {
     "toCountry",
     "mode",
     "provider",
+    "via",
     "option",
     "status",
     "needsBooking",
@@ -377,6 +414,7 @@ function applyPlace(p: Place, a: Record<string, any>) {
   for (const k of [
     "name",
     "nativeName",
+    "nativeReading",
     "kind",
     "city",
     "country",
@@ -387,6 +425,8 @@ function applyPlace(p: Place, a: Record<string, any>) {
     "halal",
     "evidence",
     "notes",
+    "googlePlaceId",
+    "applePlaceId",
   ] as const)
     if (a[k] !== undefined) (p as any)[k] = a[k];
   if (a.lat !== undefined && a.lng !== undefined) {
@@ -766,6 +806,7 @@ export const tools: Tool[] = [
             phone: r.phone,
             url: r.url,
             mapsUrl: r.mapsUrl,
+            googlePlaceId: r.source === "google" ? r.sourceId : undefined,
             rating: r.rating,
             ratingCount: r.ratingCount,
           }),

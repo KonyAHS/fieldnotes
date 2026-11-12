@@ -21,6 +21,7 @@
     "lucide-react": "^1.51.0",
     "mailparser": "^3.9.34",
     "pdfjs-dist": "^6.4.299",
+    "pinyin-pro": "^3.29.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsx": "^4.23.15",

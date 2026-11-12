@@ -94,6 +94,8 @@ export type LinkPlace = {
   hours: string;
   kind: string;
   mapsUrl: string;
+  source?: "osm" | "google";
+  sourceId?: string;
 };
 type Deps = {
   fetch: typeof fetch;
@@ -185,5 +187,11 @@ export async function resolveMapsLink(
     hours: match?.hours || "",
     kind: match?.kind || "",
     mapsUrl: u.toString().slice(0, 1000),
+    // Google's own place, so the saved place opens its Google Maps entry.
+    ...(match?.source === "google" && match.sourceId
+      ? { source: "google" as const, sourceId: match.sourceId }
+      : link.placeId
+        ? { source: "google" as const, sourceId: link.placeId }
+        : {}),
   };
 }

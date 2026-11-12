@@ -117,6 +117,9 @@ export function placeFrom(
     lat: r.lat,
     lng: r.lng,
     geo: "auto",
+    ...(r.source === "google" && r.sourceId
+      ? { googlePlaceId: r.sourceId }
+      : {}),
     notes: [
       r.hours && `Hours: ${r.hours}`,
       r.mapsUrl && `Google Maps: ${r.mapsUrl}`,
@@ -155,4 +158,49 @@ export function cityFrom(address: string, cities: string[]) {
       .sort((x, y) => y.length - x.length)
       .find((c) => a.includes(c.toLowerCase())) || ""
   );
+}
+export type LocalName = {
+  name: string;
+  address: string;
+  googlePlaceId: string;
+};
+// A place's name and address in the local script, from Google Maps (by its
+// place ID, or by name within 400 m of its position); null when not found.
+export async function lookupLocalName(
+  p: Pick<Place, "name" | "lat" | "lng" | "googlePlaceId">,
+  cc: string,
+): Promise<LocalName | null> {
+  const params = new URLSearchParams({ cc, name: p.name });
+  if (p.googlePlaceId) params.set("gid", p.googlePlaceId);
+  if (p.lat !== null && p.lng !== null)
+    params.set("near", `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
+  const res = await fetch("/api/local-name?" + params, {
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok)
+    throw Error(
+      (await res.json().catch(() => null))?.error ||
+        "Local names are unavailable right now",
+    );
+  return (await res.json()).result;
+}
+// Fills a place's empty local name and address (and a missing Google place
+// ID) from a lookup; existing values are kept. Returns whether anything new
+// was found.
+export function applyLocalName(p: Place, found: LocalName | null) {
+  if (!found) return false;
+  let changed = false;
+  if (!p.nativeName.trim() && found.name && found.name !== p.name) {
+    p.nativeName = found.name;
+    changed = true;
+  }
+  if (!p.nativeAddress.trim() && found.address) {
+    p.nativeAddress = found.address;
+    changed = true;
+  }
+  if (!p.googlePlaceId && /^[\w-]{10,300}$/.test(found.googlePlaceId)) {
+    p.googlePlaceId = found.googlePlaceId;
+    changed = true;
+  }
+  return changed;
 }

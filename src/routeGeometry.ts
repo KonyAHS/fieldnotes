@@ -3,7 +3,9 @@
 // tracks are looked up once per browser and shared by every map that shows them.
 import { useSyncExternalStore } from "react";
 import { cityPoint } from "./geo";
+import type { Entry } from "./model";
 import { type Point, greatCircle, stopKey } from "./tripRoute";
+import { type ViaStop, viaStops } from "./via";
 export type { Point };
 // Line styles: flights dashed as on a flight map, ground and sea journeys
 // in their own colours, and hops with no transport yet faint.
@@ -125,29 +127,46 @@ export type Locate = {
   missing: (city: string, country: string) => boolean;
   // The line drawn for a journey between two positions.
   path: (mode: string, a: Point, b: Point) => Point[];
+  // A journey's stops on the way (connections), those found so far.
+  stops: (journeys: Entry[]) => (ViaStop & { point: Point })[];
+  // The line through several positions, one journey's path per stretch.
+  route: (mode: string, points: Point[]) => Point[];
 };
 // `active` false stops new lookups (a collapsed map, say) but still answers
 // from what is already known.
 export function useLocate(active = true): Locate {
   const v = useVersion();
+  const point: Locate["point"] = (city, country, saved) => {
+    if (saved) return saved;
+    const key = stopKey(city, country);
+    if (active && city) askCity(city, country);
+    return cities[key] || null;
+  };
+  const path: Locate["path"] = (mode, a, b) => {
+    const kind = styleKey(mode);
+    if (kind === "Flight") return greatCircle(a, b);
+    if (kind === "Train") {
+      if (active) askRail(a, b);
+      return rails[railId(a, b)] || [a, b];
+    }
+    return [a, b];
+  };
   return {
     version: v,
-    point(city, country, saved) {
-      if (saved) return saved;
-      const key = stopKey(city, country);
-      if (active && city) askCity(city, country);
-      return cities[key] || null;
-    },
+    point,
     missing: (city, country) => cities[stopKey(city, country)] === null,
-    path(mode, a, b) {
-      const kind = styleKey(mode);
-      if (kind === "Flight") return greatCircle(a, b);
-      if (kind === "Train") {
-        if (active) askRail(a, b);
-        return rails[railId(a, b)] || [a, b];
-      }
-      return [a, b];
-    },
+    path,
+    stops: (journeys) =>
+      journeys.flatMap((j) =>
+        viaStops(j).flatMap((s) => {
+          const at = s.point || point(s.city, s.country);
+          return at ? [{ ...s, point: at }] : [];
+        }),
+      ),
+    route: (mode, points) =>
+      points
+        .slice(1)
+        .flatMap((b, i) => path(mode, points[i], b).slice(i ? 1 : 0)),
   };
 }
 // Asks the route map to open and show these positions.

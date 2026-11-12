@@ -10,6 +10,9 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { GeoResult } from "../src/locate.ts";
+import type { Point } from "../src/tripRoute.ts";
+import type { TransitWhen } from "../src/dayRoute.ts";
+import { googleTransit } from "./transit.ts";
 export type Provider = "osm" | "google";
 type MapsConfig = { provider: Provider; googleKey: string };
 const fields = [
@@ -42,6 +45,7 @@ type GooglePlace = {
 };
 export type GoogleSearch = {
   textQuery: string;
+  languageCode?: string;
   regionCode?: string;
   bias?: { lat: number; lng: number; radius: number };
   // [south, west, north, east]; results must lie inside.
@@ -111,7 +115,7 @@ export function maps(dataDir: string) {
     for (let page = 0; page < (s.pages || 1); page++) {
       const body: Record<string, unknown> = {
         textQuery: s.textQuery,
-        languageCode: "en",
+        languageCode: s.languageCode || "en",
         pageSize: 20,
       };
       if (s.regionCode) body.regionCode = s.regionCode.toUpperCase();
@@ -145,12 +149,12 @@ export function maps(dataDir: string) {
     }
     return found;
   }
-  async function details(id: string) {
+  async function details(id: string, languageCode = "en") {
     if (!/^[\w-]{10,300}$/.test(id)) throw Error("Invalid place");
     return toGeoResult(
       await call<GooglePlace>(
         read().googleKey,
-        "places/" + id + "?languageCode=en",
+        "places/" + id + "?languageCode=" + encodeURIComponent(languageCode),
         null,
         fields.join(","),
       ),
@@ -191,5 +195,9 @@ export function maps(dataDir: string) {
     },
     search,
     details,
+    // Public transport directions (Routes API); needs a key, whichever
+    // provider is chosen for searches.
+    transit: (from: Point, to: Point, when: TransitWhen) =>
+      googleTransit(read().googleKey, from, to, when),
   };
 }

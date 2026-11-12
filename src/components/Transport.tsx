@@ -58,6 +58,7 @@ import { modeOptions } from "../transportModes";
 import { RouteMap } from "./RouteMap";
 import { RoutePreview } from "./RoutePreview";
 import { useLocate } from "../routeGeometry";
+import { viaLabel, viaStops } from "../via";
 const ModeIcon = ({ mode, size = 15 }: { mode: string; size?: number }) => {
   const Icon =
     {
@@ -387,7 +388,11 @@ export function Transport({
         bookingRef: "",
         provider: "",
         title: `${via.trim()} → ${e.toCity}`,
+        // Stops set for the whole journey no longer fit either part; each
+        // part reads its own from the details again.
+        via: undefined,
       };
+      delete e.via;
       e.toCity = via.trim();
       e.toCountry = e.toCountry || e.country;
       e.endTimezone = e.timezone;
@@ -839,13 +844,38 @@ export function Transport({
                           <span key={s.id}>
                             {i > 0 && <span className="via">{s.city}</span>}
                             <ModeIcon mode={s.mode} />
+                            {/* Connections within one journey (Dubai on a
+                                flight to Tokyo). */}
+                            {viaStops(s).map((v) => (
+                              <span
+                                key={v.name}
+                                title={`Via ${viaLabel(v)}${v.source === "assumed" ? " (assumed from the airline)" : ""}`}
+                              >
+                                <span
+                                  className={`via ${v.source === "assumed" ? "assumed" : ""}`}
+                                >
+                                  {v.code || v.name}
+                                </span>
+                                <ModeIcon mode={s.mode} />
+                              </span>
+                            ))}
                           </span>
                         ))}
                       </span>
                       <strong>
                         {o.modes.join(" + ")}
-                        {o.segments.length > 1 &&
-                          ` · ${o.segments.length - 1} change${o.segments.length > 2 ? "s" : ""}`}
+                        {(() => {
+                          const n =
+                            o.segments.length -
+                            1 +
+                            o.segments.reduce(
+                              (sum, s) => sum + viaStops(s).length,
+                              0,
+                            );
+                          return n > 0
+                            ? ` · ${n} change${n > 1 ? "s" : ""}`
+                            : "";
+                        })()}
                       </strong>
                       <span className="option-badges">
                         {o.status === "booked" && (

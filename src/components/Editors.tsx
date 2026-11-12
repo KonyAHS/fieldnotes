@@ -10,6 +10,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Modal } from "./Modal";
+import { useReading } from "./LocalName";
 import {
   type Entry,
   type Place,
@@ -24,6 +25,9 @@ import {
   addDays,
   uid,
   mapLinks,
+  placeMaps,
+  openLocalMap,
+  placeIdFromLink,
   phoneLink,
   webLink,
   bookingState,
@@ -44,6 +48,7 @@ import {
 import { PlacePicker } from "./PlacePicker";
 import { TicketDetails } from "./Attachments";
 import { modeOptions } from "../transportModes";
+import { viaLabel, viaStops, viaText } from "../via";
 const placeKinds: Record<Entry["type"], Place["kind"]> = {
   activity: "attraction",
   stay: "hotel",
@@ -425,6 +430,11 @@ export function EntryEditor({
                   onChange={(e) => change("provider", e.target.value)}
                 />
               </Field>
+              {entry.scope === "intercity" && (
+                <Field label="Stops on the way" full>
+                  <ViaInput entry={entry} onChange={(v) => change("via", v)} />
+                </Field>
+              )}
               <Field label="Journey">
                 <select
                   value={entry.scope}
@@ -730,6 +740,70 @@ export function EntryEditor({
     </Modal>
   );
 }
+// Links the place to its own entry in Google Maps and Apple Maps: paste the
+// link from the app's Share button.
+function MapEntryField({
+  place,
+  change,
+}: {
+  place: Place;
+  change: <K extends keyof Place>(key: K, value: Place[K]) => void;
+}) {
+  const [text, setText] = useState("");
+  const [note, setNote] = useState("");
+  const linked = [
+    place.googlePlaceId && "Google Maps",
+    place.applePlaceId && "Apple Maps",
+  ].filter(Boolean);
+  return (
+    <Field label="Map app entries" full>
+      <input
+        value={text}
+        placeholder="Paste a Google Maps or Apple Maps place link"
+        onChange={(e) => {
+          const v = e.target.value;
+          setText(v);
+          if (!v.trim()) return setNote("");
+          const found = placeIdFromLink(v);
+          if (found.googlePlaceId) {
+            change("googlePlaceId", found.googlePlaceId);
+            setNote("Linked to the Google Maps entry.");
+            setText("");
+          } else if (found.applePlaceId) {
+            change("applePlaceId", found.applePlaceId);
+            setNote("Linked to the Apple Maps entry.");
+            setText("");
+          } else
+            setNote(
+              "No place in this link. In the map app, open the place and use Share → Copy link (Google short links: use Add place → paste link instead).",
+            );
+        }}
+      />
+      <span className="attachment-hint">
+        {note ||
+          (linked.length
+            ? `Opens its own entry in ${linked.join(" and ")}.`
+            : "Not linked yet: map apps search for the name near the place.")}
+        {linked.length > 0 && (
+          <>
+            {" "}
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                change("googlePlaceId", undefined);
+                change("applePlaceId", undefined);
+                setNote("");
+              }}
+            >
+              Unlink
+            </button>
+          </>
+        )}
+      </span>
+    </Field>
+  );
+}
 // The chosen place at a glance in the plan editor, with a way into its details.
 function PlaceCard({
   place,
@@ -740,7 +814,7 @@ function PlaceCard({
   unsaved: boolean;
   onOpen: () => void;
 }) {
-  const maps = mapLinks(place).find((l) => l.name === "Google Maps")!;
+  const maps = placeMaps(place);
   const notes = place.notes.trim().split("\n")[0];
   return (
     <div className="place-card-mini full">
@@ -778,12 +852,32 @@ function PlaceCard({
         )}
         <a
           className="text-button"
-          href={maps.url}
+          href={maps.google}
           target="_blank"
           rel="noreferrer"
         >
           <ExternalLink size={13} /> Google Maps
         </a>
+        <a
+          className="text-button"
+          href={maps.apple}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <ExternalLink size={13} /> Apple Maps
+        </a>
+        {maps.local.map((l) => (
+          <a
+            key={l.name}
+            className="text-button"
+            href={l.place}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(ev) => openLocalMap(ev, l.place, l.app)}
+          >
+            <ExternalLink size={13} /> {l.name}
+          </a>
+        ))}
         <button type="button" className="text-button" onClick={onOpen}>
           <Pencil size={13} /> Place details
         </button>
@@ -817,6 +911,7 @@ export function PlaceEditor({
   }, []);
   const change = <K extends keyof Place>(key: K, value: Place[K]) =>
     setPlace((p) => ({ ...p, [key]: value }));
+  const autoReading = useReading({ ...place, nativeReading: "" });
   // Fills empty fields from a search result or link; the position is always
   // taken because it is what was chosen.
   const fill = (found: Place, category = "") =>
@@ -1028,6 +1123,19 @@ export function PlaceEditor({
               onChange={(e) => change("nativeName", e.target.value)}
             />
           </Field>
+          {place.nativeName.trim() && (
+            <Field label="Pronunciation (pinyin, romaji…)" full>
+              <input
+                value={place.nativeReading || ""}
+                placeholder={
+                  autoReading || "Worked out for Chinese, kana and Hangul"
+                }
+                onChange={(e) =>
+                  change("nativeReading", e.target.value || undefined)
+                }
+              />
+            </Field>
+          )}
           <Field label="Type">
             <select
               value={place.kind}
@@ -1085,6 +1193,7 @@ export function PlaceEditor({
               onChange={(e) => change("url", e.target.value)}
             />
           </Field>
+          <MapEntryField place={place} change={change} />
           {place.kind === "restaurant" && (
             <>
               <Field label="Halal status" full>
@@ -1184,10 +1293,24 @@ export function PlaceEditor({
           />
         </details>
         <div className="map-links">
+          <a href={placeMaps(place).google} target="_blank" rel="noreferrer">
+            Google Maps
+            <ExternalLink size={13} />
+          </a>
+          <a href={placeMaps(place).apple} target="_blank" rel="noreferrer">
+            Apple Maps
+            <ExternalLink size={13} />
+          </a>
           {mapLinks(place)
-            .slice(0, 2)
+            .filter((l) => l.name !== "Google Maps")
             .map((l) => (
-              <a key={l.name} href={l.url} target="_blank" rel="noreferrer">
+              <a
+                key={l.name}
+                href={l.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(ev) => openLocalMap(ev, l.url, l.app)}
+              >
                 {l.name}
                 <ExternalLink size={13} />
               </a>
@@ -1327,4 +1450,44 @@ export function newTrip(): Trip {
     activeScenarioId: scenario,
     tasks: [],
   };
+}
+// Connections, comma-separated ("DXB 10:55–12:55, CMB"); kept as typed until
+// the field is left. Empty reads them from the journey's text again.
+function ViaInput({
+  entry,
+  onChange,
+}: {
+  entry: Entry;
+  onChange: (via: string[] | undefined) => void;
+}) {
+  const saved = entry.via?.join(", ") ?? "";
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const found = viaStops({ ...entry, via: undefined });
+  const assumed = found.some((s) => s.source === "assumed");
+  return (
+    <>
+      <input
+        value={text}
+        placeholder={
+          found.length ? viaText(found) : "e.g. DXB 10:55–12:55, CMB"
+        }
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          const list = text
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          onChange(list.length ? list : undefined);
+        }}
+      />
+      <small className="field-hint">
+        {entry.via
+          ? 'Airport codes or places, in order. "direct" for none.'
+          : found.length
+            ? `${assumed ? "Assumed from the airline" : "Found in the details"}: ${found.map(viaLabel).join(" · ")}. Type to change.`
+            : "Airport codes or places, in order, with times if you like. Left empty, stops are read from the details."}
+      </small>
+    </>
+  );
 }

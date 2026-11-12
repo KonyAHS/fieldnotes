@@ -23,7 +23,13 @@ const project = ([lat, lng]: Point): [number, number] => {
     (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TILE,
   ];
 };
-type Line = { points: Point[]; mode: string; faint: boolean };
+type Line = {
+  points: Point[];
+  mode: string;
+  faint: boolean;
+  // Connections on the way, drawn as change points.
+  via?: Point[];
+};
 export function RoutePreview({
   leg,
   places,
@@ -56,8 +62,16 @@ export function RoutePreview({
     o.segments.flatMap((s) => {
       const a = at(s.city, s.country),
         b = at(s.toCity, s.toCountry || s.country);
+      const via = locate.stops([s]).map((v) => v.point);
       return a && b
-        ? [{ points: locate.path(s.mode, a, b), mode: s.mode, faint }]
+        ? [
+            {
+              points: locate.route(s.mode, [a, ...via, b]),
+              mode: s.mode,
+              faint,
+              via,
+            },
+          ]
         : [];
     });
   const chosen = leg.options.find((o) => o.status !== "alternative");
@@ -117,7 +131,10 @@ export function RoutePreview({
       sum + l.points.slice(1).reduce((d, p, i) => d + km(l.points[i], p), 0),
     0,
   );
-  const vias = main.slice(1).map((l) => l.points[0]);
+  const vias = [
+    ...main.slice(1).map((l) => l.points[0]),
+    ...main.flatMap((l) => l.via || []),
+  ];
   return (
     <button
       className="leg-preview"

@@ -1,9 +1,17 @@
 // Shows an attachment inside the app, so tickets and confirmations can be read
 // offline on any device. PDFs are drawn with pdf.js because phones only show
 // the first page of a PDF placed in a frame.
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Attachment } from "../model";
 import { fileBlob } from "../attachments";
+import {
+  readable,
+  items,
+  shortUrl,
+  looksLikeEmail,
+  parseEmail,
+  htmlText,
+} from "../readableText";
 
 export type PreviewKind =
   "image" | "pdf" | "text" | "html" | "docx" | "audio" | "video" | "other";
@@ -85,20 +93,34 @@ export function FilePreview({ attachment: a }: { attachment: Attachment }) {
   }
 }
 
-// Plain text with clickable web links.
-function Linked({ text }: { text: string }) {
-  const parts = text.split(/(https?:\/\/[^\s<>"']+)/g);
+// Text with tappable web links (shown short), email addresses and phone
+// numbers.
+const linkable =
+  /(https?:\/\/[^\s<>"'\]]+[^\s<>"'\].,;:!?)]|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\+\d[\d ()-]{6,}\d)/g;
+function Linked({ text, short = false }: { text: string; short?: boolean }) {
+  const parts = text.split(linkable);
   return (
     <>
-      {parts.map((p, i) =>
-        i % 2 ? (
-          <a key={i} href={p} target="_blank" rel="noreferrer">
+      {parts.map((p, i) => {
+        if (i % 2 === 0) return <Fragment key={i}>{p}</Fragment>;
+        if (p.startsWith("http"))
+          return (
+            <a key={i} href={p} target="_blank" rel="noreferrer" title={p}>
+              {short ? shortUrl(p) : p}
+            </a>
+          );
+        if (p.includes("@"))
+          return (
+            <a key={i} href={`mailto:${p}`}>
+              {p}
+            </a>
+          );
+        return (
+          <a key={i} href={`tel:${p.replace(/[^\d+]/g, "")}`}>
             {p}
           </a>
-        ) : (
-          <Fragment key={i}>{p}</Fragment>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -115,8 +137,13 @@ async function readText(blob: Blob) {
     }
   }
 }
+// Text files and saved emails: a tidied, readable version by default, the
+// file exactly as saved on request (and the email's own layout for .eml).
 function TextPreview({ blob }: { blob: Blob }) {
   const [text, setText] = useState<string | null>(null);
+  const [mode, setMode] = useState<"readable" | "layout" | "original">(
+    "readable",
+  );
   useEffect(() => {
     let cancelled = false;
     void readText(blob).then((t) => !cancelled && setText(t));
@@ -124,13 +151,107 @@ function TextPreview({ blob }: { blob: Blob }) {
       cancelled = true;
     };
   }, [blob]);
-  if (text === null) return <p className="notice">Opening…</p>;
+  const email = useMemo(
+    () => (text && looksLikeEmail(text) ? parseEmail(text) : null),
+    [text],
+  );
+  const tidy = useMemo(() => {
+    if (text === null) return null;
+    if (!email) return readable(text.slice(0, 500_000));
+    const r = readable(
+      (email.text || (email.html ? htmlText(email.html) : "")).slice(
+        0,
+        500_000,
+      ),
+    );
+    return {
+      ...r,
+      title: email.subject || r.title,
+      meta: [
+        email.from && { label: "From", value: email.from },
+        email.date && { label: "Date", value: localDate(email.date) },
+        ...r.meta,
+      ].filter((m): m is { label: string; value: string } => !!m),
+    };
+  }, [text, email]);
+  if (text === null || !tidy) return <p className="notice">Opening…</p>;
   if (!text.trim()) return <p className="notice">This file is empty.</p>;
   return (
-    <pre className="file-text">
-      <Linked text={text.slice(0, 500_000)} />
-    </pre>
+    <div className="file-text-preview">
+      <div className="segmented file-text-mode">
+        <button
+          className={mode === "readable" ? "selected" : ""}
+          onClick={() => setMode("readable")}
+        >
+          Readable
+        </button>
+        {email?.html && (
+          <button
+            className={mode === "layout" ? "selected" : ""}
+            onClick={() => setMode("layout")}
+          >
+            Email layout
+          </button>
+        )}
+        <button
+          className={mode === "original" ? "selected" : ""}
+          onClick={() => setMode("original")}
+        >
+          Original
+        </button>
+      </div>
+      {mode === "readable" && (
+        <article className="file-text readable-text">
+          {tidy.title && <h3>{tidy.title}</h3>}
+          {!!tidy.meta.length && (
+            <p className="readable-meta">
+              {tidy.meta.map((m) => (
+                <span key={m.label}>
+                  {m.label}: {m.value}
+                </span>
+              ))}
+            </p>
+          )}
+          {items(tidy.blocks).map((it, i) =>
+            it.kind === "pair" ? (
+              <p key={i} className="readable-pair">
+                <span>{it.label}</span>
+                <strong>
+                  <Linked text={it.value} short />
+                </strong>
+              </p>
+            ) : (
+              <p key={i}>
+                {it.lines.map((l, j) => (
+                  <Fragment key={j}>
+                    {j > 0 && <br />}
+                    <Linked text={l} short />
+                  </Fragment>
+                ))}
+              </p>
+            ),
+          )}
+        </article>
+      )}
+      {mode === "layout" && email?.html && (
+        <HtmlFrame html={email.html} title={email.subject || "Email"} />
+      )}
+      {mode === "original" && (
+        <pre className="file-text">
+          <Linked text={text.slice(0, 500_000)} />
+        </pre>
+      )}
+    </div>
   );
+}
+function localDate(value: string) {
+  const t = Date.parse(value);
+  return Number.isNaN(t)
+    ? value
+    : new Date(t).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
 }
 
 // Saved web pages and HTML emails. Scripts don't run and nothing is loaded
@@ -139,23 +260,22 @@ function HtmlPreview({ blob, title }: { blob: Blob; title: string }) {
   const [html, setHtml] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void readText(blob).then(
-      (t) =>
-        !cancelled &&
-        setHtml(
-          `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:"><meta name="viewport" content="width=device-width, initial-scale=1"><base target="_blank">` +
-            t,
-        ),
-    );
+    void readText(blob).then((t) => !cancelled && setHtml(t));
     return () => {
       cancelled = true;
     };
   }, [blob]);
   if (html === null) return <p className="notice">Opening…</p>;
+  return <HtmlFrame html={html} title={title} />;
+}
+function HtmlFrame({ html, title }: { html: string; title: string }) {
   return (
     <iframe
       title={title}
-      srcDoc={html}
+      srcDoc={
+        `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:"><meta name="viewport" content="width=device-width, initial-scale=1"><base target="_blank">` +
+        html
+      }
       sandbox="allow-popups allow-popups-to-escape-sandbox"
     />
   );

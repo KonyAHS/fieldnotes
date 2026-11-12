@@ -26,6 +26,8 @@ import {
   useLocate,
 } from "../routeGeometry";
 import { type Hop, type Point, type Stop, tripRoute } from "../tripRoute";
+import { BufferedTiles, smoothWheel } from "../mapControls";
+import { viaLabel, viaStops } from "../via";
 const icons: Record<string, typeof Plane> = {
   Train: TrainFront,
   Shinkansen: TrainFront,
@@ -76,6 +78,12 @@ function hopPopup(h: Hop) {
         "span",
         `${day(j.date)} ${j.startTime} · ${j.mode || "Travel"} ${j.city} → ${j.toCity}${j.provider ? ` · ${j.provider}` : ""}${j.status === "booked" ? " · booked" : ""}`,
       ),
+      ...viaStops(j).map((v) =>
+        text(
+          "span",
+          `Via ${viaLabel(v)}${v.source === "assumed" ? " (assumed)" : ""}`,
+        ),
+      ),
     );
   return el;
 }
@@ -93,82 +101,6 @@ function stopPopup(visits: Stop[]) {
   return el;
 }
 
-// Loads a ring of tiles beyond the visible area, so panning shows the map
-// at once instead of blank squares while tiles download.
-const BufferedTiles = L.TileLayer.extend({
-  _getTiledPixelBounds(this: L.TileLayer, center: L.LatLng) {
-    const bounds = (
-      L.TileLayer.prototype as unknown as {
-        _getTiledPixelBounds(c: L.LatLng): L.Bounds;
-      }
-    )._getTiledPixelBounds.call(this, center);
-    const pad = this.getTileSize().multiplyBy(1.5);
-    return L.bounds(bounds.min!.subtract(pad), bounds.max!.add(pad));
-  },
-}) as unknown as typeof L.TileLayer;
-// Leaflet's wheel zoom ignores the wheel while a zoom animates, so zooming
-// several levels needed pauses. Here every wheel event moves a target zoom
-// and the map eases toward it each frame (as a pinch does), keeping the point
-// under the pointer in place.
-function smoothWheel(map: L.Map) {
-  const m = map as L.Map & {
-    _move(center: L.LatLng, zoom: number, data: object): void;
-    _moveStart(zoomChanged: boolean, noMoveStart: boolean): void;
-    _moveEnd(zoomChanged: boolean): void;
-    _stop(): void;
-  };
-  const el = map.getContainer();
-  let goal = 0,
-    zoom = 0,
-    frame = 0,
-    last = 0,
-    anchor = L.point(0, 0);
-  const step = () => {
-    zoom += (goal - zoom) * 0.3;
-    if (Math.abs(goal - zoom) < 0.002) zoom = goal;
-    const half = map.getSize().divideBy(2);
-    const scale = map.getZoomScale(zoom, map.getZoom());
-    const shift = anchor.subtract(half).multiplyBy(1 - 1 / scale);
-    m._move(map.containerPointToLatLng(half.add(shift)), zoom, {
-      pinch: true,
-    });
-    // Once the wheel has been still a moment, settles on the nearest whole
-    // level (tiles are sharp there and show no seams), then ends.
-    if (zoom === goal && performance.now() - last > 150) {
-      if (goal !== Math.round(goal)) goal = Math.round(goal);
-      else {
-        frame = 0;
-        m._moveEnd(true);
-        return;
-      }
-    }
-    frame = requestAnimationFrame(step);
-  };
-  const wheel = (e: WheelEvent) => {
-    e.preventDefault();
-    last = performance.now();
-    anchor = map.mouseEventToContainerPoint(e);
-    const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 800 : 1;
-    // A wheel notch (about 100 px) is one level; trackpad pinches (sent
-    // with ctrlKey) have small steps and get more weight.
-    const delta = (-e.deltaY * unit) / (e.ctrlKey ? 40 : 100);
-    if (!frame) {
-      m._stop();
-      zoom = goal = map.getZoom();
-      m._moveStart(true, false);
-      frame = requestAnimationFrame(step);
-    }
-    goal = Math.min(
-      map.getMaxZoom(),
-      Math.max(map.getMinZoom(), goal + Math.max(-1, Math.min(1, delta))),
-    );
-  };
-  el.addEventListener("wheel", wheel, { passive: false });
-  return () => {
-    el.removeEventListener("wheel", wheel);
-    cancelAnimationFrame(frame);
-  };
-}
 const storageKey = "fieldnotes.routeMap";
 const sizeKey = "fieldnotes.routeMapSize";
 const readJson = <T,>(key: string, fallback: T): T => {
@@ -383,7 +315,22 @@ export function RouteMap({
         b = point(h.to);
       if (!a || !b) continue;
       const style = styles[styleKey(h.mode)];
-      const path = locate.path(h.mode, a, b);
+      // Connections on the way (Dubai on a flight to Tokyo) are passed through.
+      const via = locate.stops(h.journeys);
+      const path = locate.route(h.mode, [a, ...via.map((v) => v.point), b]);
+      for (const v of via)
+        L.marker(v.point, {
+          icon: L.divIcon({
+            className: `via-stop ${v.source === "assumed" ? "assumed" : ""}`,
+            iconSize: [12, 12],
+          }),
+          zIndexOffset: 400,
+        })
+          .bindTooltip(
+            `Via ${viaLabel(v)}${v.source === "assumed" ? " · assumed from the airline" : ""}`,
+          )
+          .bindPopup(hopPopup(h))
+          .addTo(group);
       const line = L.polyline(path, {
         color: style.color,
         weight: style.weight,

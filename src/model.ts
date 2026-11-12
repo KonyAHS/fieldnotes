@@ -31,6 +31,9 @@ export const PlaceSchema = z
     id: short,
     name: short.min(1),
     nativeName: short,
+    // How to say the local name: pinyin, romaji, Jyutping or romanized
+    // Korean. Unset, it is worked out from the name where possible.
+    nativeReading: short.optional(),
     kind: z.enum(["attraction", "restaurant", "hotel", "station", "other"]),
     country: short,
     city: short,
@@ -54,6 +57,17 @@ export const PlaceSchema = z
     // How the coordinates were obtained: looked up automatically (exact or
     // city-level), entered by hand, or not found by the automatic lookup.
     geo: z.enum(["auto", "approx", "manual", "failed"]).optional(),
+    // The place's own entry in Google Maps and Apple Maps, so links open its
+    // page (name, hours, photos) instead of a dropped pin. Apple IDs from old
+    // share links ("auid") are stored as "auid:<number>".
+    googlePlaceId: z
+      .string()
+      .regex(/^[\w-]{10,300}$/)
+      .optional(),
+    applePlaceId: z
+      .string()
+      .regex(/^([A-Z][0-9A-Z]{7,40}|auid:\d{3,30})$/)
+      .optional(),
   })
   .refine(
     (v) => (v.lat === null) === (v.lng === null),
@@ -98,6 +112,9 @@ export const EntrySchema = z
     option: short.optional(),
     // Transport: operator and service, e.g. "JR Nozomi 21" or "Peach MM702".
     provider: short.optional(),
+    // Transport: stops on the way ("DXB 10:55–12:55", "Shin-Osaka"); unset
+    // reads them from the journey's text, ["direct"] means none.
+    via: z.array(short).max(12).optional(),
     status: z.enum(["idea", "planned", "booked", "done"]),
     // Whether the plan has to be reserved; unset uses the default for its
     // kind (hotels and journeys between cities do).
@@ -236,6 +253,11 @@ export function addDays(date: string, n: number) {
   const d = new Date(date + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+// The device's calendar date; abroad the phone uses local time.
+export function deviceToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 export function days(start: string, end: string) {
   const result: string[] = [];
@@ -700,7 +722,7 @@ export function mapLinks(p: Place, food = false) {
     ? `${p.country === "China" ? "清真餐厅" : p.country === "Korea" ? "할랄 음식점" : "halal restaurants"} ${p.nativeName || p.name} ${p.city}`
     : `${p.nativeName || p.name} ${p.nativeAddress || p.address || p.city}`;
   const encoded = encodeURIComponent(q);
-  const links = [
+  const links: { name: string; url: string; app?: AppLink }[] = [
     {
       name: "Google Maps",
       url: `https://www.google.com/maps/search/?api=1&query=${encoded}`,
@@ -712,15 +734,194 @@ export function mapLinks(p: Place, food = false) {
   ];
   if (p.country === "Korea")
     links.unshift(
-      { name: "Naver", url: `https://map.naver.com/p/search/${encoded}` },
-      { name: "Kakao", url: `https://map.kakao.com/?q=${encoded}` },
+      {
+        name: "Naver",
+        url: `https://map.naver.com/p/search/${encoded}`,
+        app: same(`nmap://search?query=${encoded}&appname=fieldnotes`),
+      },
+      {
+        name: "Kakao",
+        url: `https://map.kakao.com/?q=${encoded}`,
+        app: same(`kakaomap://search?q=${encoded}`),
+      },
     );
   if (p.country === "China")
     links.unshift(
-      { name: "Amap", url: `https://www.amap.com/search?query=${encoded}` },
-      { name: "Baidu", url: `https://map.baidu.com/search/${encoded}` },
+      {
+        name: "Amap",
+        url: `https://www.amap.com/search?query=${encoded}`,
+        app: {
+          ios: `iosamap://poi?sourceApplication=fieldnotes&name=${encoded}`,
+          android: `androidamap://poi?sourceApplication=fieldnotes&keywords=${encoded}`,
+        },
+      },
+      {
+        name: "Baidu",
+        url: `https://map.baidu.com/search/${encoded}`,
+        app: same(
+          `baidumap://map/place/search?query=${encoded}&src=fieldnotes`,
+        ),
+      },
     );
   return links;
+}
+export type AppLink = { ios: string; android: string };
+const same = (link: string): AppLink => ({ ios: link, android: link });
+export type LocalMapLink = {
+  name: string;
+  place: string;
+  way?: string;
+  app?: AppLink;
+  wayApp?: AppLink;
+};
+const appPackages: Record<string, string> = {
+  androidamap: "com.autonavi.minimap",
+  amapuri: "com.autonavi.minimap",
+  nmap: "com.nhn.android.nmap",
+  baidumap: "com.baidu.BaiduMap",
+  kakaomap: "net.daum.android.map",
+};
+// Opens a local map app straight away instead of its web page, which only
+// offers an "open in app" button. iPhones get the app's own link; Android an
+// intent link, which falls back to the web page when the app is missing.
+// Elsewhere the web link opens as usual. Use as a link's click handler.
+export function openLocalMap(
+  event: { preventDefault: () => void },
+  web: string,
+  app: AppLink | undefined,
+) {
+  if (!app) return;
+  const ua = navigator.userAgent;
+  const ios =
+    /iPhone|iPad|iPod/.test(ua) ||
+    (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  let target = "";
+  if (ios) target = app.ios;
+  else if (/Android/.test(ua)) {
+    const m = /^([a-z]+):\/\/(.*)$/.exec(app.android);
+    if (m)
+      target =
+        `intent://${m[2]}#Intent;scheme=${m[1]};` +
+        (appPackages[m[1]] ? `package=${appPackages[m[1]]};` : "") +
+        `S.browser_fallback_url=${encodeURIComponent(web)};end`;
+  }
+  if (!target) return;
+  event.preventDefault();
+  window.location.href = target;
+}
+// Opening a place in Google Maps and Apple Maps: its own entry, and
+// directions to it. Without a saved place ID each app searches for the name
+// near the place, which opens the entry when there is one clear match.
+export function placeMaps(p: Place) {
+  const located = p.lat !== null && p.lng !== null;
+  const at = located ? `${p.lat},${p.lng}` : "";
+  const label = p.nativeName || p.name;
+  const where = p.nativeAddress || p.address || p.city;
+  const text = `${label} ${where}`.trim();
+  const e = encodeURIComponent;
+  const google = p.googlePlaceId
+    ? `https://www.google.com/maps/search/?api=1&query=${e(label)}&query_place_id=${e(p.googlePlaceId)}`
+    : `https://www.google.com/maps/search/?api=1&query=${e(text)}`;
+  const googleWay = p.googlePlaceId
+    ? `https://www.google.com/maps/dir/?api=1&destination=${e(label)}&destination_place_id=${e(p.googlePlaceId)}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${at || e(text)}`;
+  const auid = p.applePlaceId?.startsWith("auid:")
+    ? p.applePlaceId.slice(5)
+    : "";
+  const appleId = p.applePlaceId && !auid ? p.applePlaceId : "";
+  const apple = appleId
+    ? `https://maps.apple.com/place?place-id=${e(appleId)}`
+    : auid
+      ? `https://maps.apple.com/?auid=${e(auid)}${located ? `&ll=${at}` : ""}&q=${e(p.name)}`
+      : `https://maps.apple.com/search?query=${e(p.name + (p.city ? ` ${p.city}` : ""))}${located ? `&center=${at}` : ""}`;
+  const appleWay =
+    `https://maps.apple.com/directions?destination=${at || e(text)}` +
+    (appleId ? `&destination-place-id=${e(appleId)}` : "");
+  // Local map apps where Google is incomplete: Amap in mainland China,
+  // Naver and Kakao in Korea. Amap and Kakao take the saved position. Each
+  // also has its app's own link (`app`/`wayApp`), opened directly on phones
+  // so the browser's "open in app" page is skipped; see openLocalMap.
+  const local: LocalMapLink[] = [];
+  const search = encodeURIComponent(text);
+  const from = "fieldnotes";
+  if (p.country === "China") {
+    const name = e(label);
+    // dev=1: the coordinates are GPS (WGS84) and Amap shifts them itself.
+    const view = `viewMap?sourceApplication=${from}&poiname=${name}&lat=${p.lat}&lon=${p.lng}&dev=1`;
+    const way = `sourceApplication=${from}&dlat=${p.lat}&dlon=${p.lng}&dname=${name}&dev=1&t=1`;
+    local.push({
+      name: "Amap",
+      place: located
+        ? `https://uri.amap.com/marker?position=${p.lng},${p.lat}&name=${name}&coordinate=wgs84&callnative=1`
+        : `https://www.amap.com/search?query=${search}`,
+      way: located
+        ? `https://uri.amap.com/navigation?to=${p.lng},${p.lat},${name}&mode=bus&coordinate=wgs84&callnative=1`
+        : undefined,
+      app: located
+        ? { ios: `iosamap://${view}`, android: `androidamap://${view}` }
+        : {
+            ios: `iosamap://poi?sourceApplication=${from}&name=${search}`,
+            android: `androidamap://poi?sourceApplication=${from}&keywords=${search}`,
+          },
+      wayApp: located
+        ? {
+            ios: `iosamap://path?${way}`,
+            android: `amapuri://route/plan/?${way}`,
+          }
+        : undefined,
+    });
+  }
+  if (p.country === "Korea") {
+    const naver = `nmap://search?query=${search}&appname=${from}`;
+    local.push({
+      name: "Naver",
+      place: `https://map.naver.com/p/search/${search}`,
+      app: { ios: naver, android: naver },
+    });
+    const look = located ? `kakaomap://look?p=${p.lat},${p.lng}` : "";
+    const route = located
+      ? `kakaomap://route?ep=${p.lat},${p.lng}&by=PUBLICTRANSIT`
+      : "";
+    local.push({
+      name: "Kakao",
+      place: located
+        ? `https://map.kakao.com/link/map/${e(label)},${p.lat},${p.lng}`
+        : `https://map.kakao.com/?q=${search}`,
+      way: located
+        ? `https://map.kakao.com/link/to/${e(label)},${p.lat},${p.lng}`
+        : undefined,
+      app: located ? { ios: look, android: look } : undefined,
+      wayApp: located ? { ios: route, android: route } : undefined,
+    });
+  }
+  return { google, googleWay, apple, appleWay, local };
+}
+// Reads a place ID from a Google Maps or Apple Maps link.
+export function placeIdFromLink(link: string): {
+  googlePlaceId?: string;
+  applePlaceId?: string;
+} {
+  let u: URL;
+  try {
+    u = new URL(link.trim());
+  } catch {
+    return {};
+  }
+  const q = u.searchParams;
+  if (/(^|\.)apple\.com$/i.test(u.hostname)) {
+    const id = q.get("place-id") || q.get("destination-place-id") || "";
+    if (/^[A-Z][0-9A-Z]{7,40}$/.test(id)) return { applePlaceId: id };
+    const auid = q.get("auid") || "";
+    if (/^\d{3,30}$/.test(auid)) return { applePlaceId: `auid:${auid}` };
+    return {};
+  }
+  const id =
+    q.get("query_place_id") ||
+    q.get("destination_place_id") ||
+    q.get("place_id") ||
+    (q.get("q") || "").match(/^place_id:([\w-]+)$/)?.[1] ||
+    "";
+  return /^[\w-]{10,300}$/.test(id) ? { googlePlaceId: id } : {};
 }
 // One line of a day's activity plan, split up for formatting.
 export type VisaItem = {

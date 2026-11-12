@@ -13,8 +13,17 @@ import {
   Mountain,
   Phone,
   LoaderCircle,
+  Languages,
 } from "lucide-react";
-import { geocode, mapsStatus, type MapsStatus } from "../geo";
+import {
+  type LocalName,
+  applyLocalName,
+  geocode,
+  lookupLocalName,
+  mapsStatus,
+  type MapsStatus,
+} from "../geo";
+import { localCode } from "../localLanguage";
 import { mutate, notify } from "../sync";
 import {
   type Workspace,
@@ -24,6 +33,7 @@ import {
   type Entry,
   emptyPlace,
   mapLinks,
+  openLocalMap,
   safeUrl,
   distance,
   shortDate,
@@ -252,6 +262,82 @@ function PhoneFill({ places }: { places: Place[] }) {
     </div>
   );
 }
+// Places in a country with a known local language but no local name or
+// address yet, that can be looked up (a Google place ID or a position).
+const needsLocal = (p: Place) =>
+  Boolean(localCode(p.country)) &&
+  (!p.nativeName.trim() || !p.nativeAddress.trim()) &&
+  (Boolean(p.googlePlaceId) || p.lat !== null) &&
+  !/search area|placeholder/i.test(p.name);
+// Fills missing local-language names and addresses from Google Maps, so
+// they can be shown to drivers and pasted into local taxi and map apps.
+function LocalFill({ places }: { places: Place[] }) {
+  const missing = places.filter(needsLocal);
+  const [status, setStatus] = useState<MapsStatus | null>(null);
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [result, setResult] = useState("");
+  useEffect(() => {
+    void mapsStatus().then(setStatus);
+  }, []);
+  if (!status?.google.configured || (!missing.length && !result)) return null;
+  async function run() {
+    const queue = [...missing];
+    const found = new Map<string, LocalName>();
+    let failed = 0;
+    setResult("");
+    setProgress({ done: 0, total: queue.length });
+    for (const [i, p] of queue.entries()) {
+      try {
+        const hit = await lookupLocalName(p, localCode(p.country));
+        if (hit) found.set(p.id, hit);
+      } catch {
+        failed++;
+      }
+      setProgress({ done: i + 1, total: queue.length });
+    }
+    let filled = 0;
+    if (found.size)
+      mutate((d) => {
+        for (const p of d.places)
+          if (found.has(p.id) && applyLocalName(p, found.get(p.id)!)) filled++;
+      });
+    setProgress(null);
+    const text = `Filled local names for ${filled} of ${queue.length} places.`;
+    setResult(
+      failed
+        ? `${text} ${failed} lookups failed; try again later.`
+        : filled < queue.length
+          ? `${text} The rest weren't found near their saved position.`
+          : text,
+    );
+    if (filled) notify(text);
+  }
+  return (
+    <div className="phone-fill">
+      <Languages size={15} />
+      {progress ? (
+        <span>
+          <LoaderCircle size={14} className="spin" /> Looking up local names…{" "}
+          {progress.done} of {progress.total}
+        </span>
+      ) : result ? (
+        <span>{result}</span>
+      ) : (
+        <span>
+          {missing.length} places have no local-language name or address.
+        </span>
+      )}
+      {!progress && missing.length > 0 && (
+        <button className="button" onClick={() => void run()}>
+          Fill local names
+        </button>
+      )}
+    </div>
+  );
+}
 export function Places({
   data,
   trip,
@@ -463,7 +549,15 @@ export function Places({
           </details>
         )}
         <div className="place-actions">
-          <a href={mapLinks(p)[0].url} target="_blank" rel="noreferrer">
+          <a
+            href={mapLinks(p)[0].url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(ev) => {
+              const l = mapLinks(p)[0];
+              openLocalMap(ev, l.url, l.app);
+            }}
+          >
             <Navigation size={14} />
             {mapLinks(p)[0].name}
           </a>
@@ -645,6 +739,7 @@ export function Places({
         </>
       )}
       <PhoneFill places={data.places} />
+      <LocalFill places={data.places} />
       <div className="list-heading" id="place-results">
         <h2>Saved places</h2>
         <span>

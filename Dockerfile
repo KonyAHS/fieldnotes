@@ -16,7 +16,9 @@ RUN npm ci --omit=dev && npm cache clean --force \
   && mkdir -p /data && chown node:node /data
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
-COPY --from=build /app/src/model.ts /app/src/seed.ts /app/src/locate.ts /app/src/calendar.ts /app/src/tripRoute.ts /app/src/catalogue.json ./src/
+# The server imports shared code from src/; copy all of it so a new module
+# can't be left out of the image.
+COPY --from=build /app/src ./src
 USER node
 VOLUME /data
 EXPOSE 3000
