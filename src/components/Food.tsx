@@ -65,6 +65,16 @@ export const googleMapsLink = (r: FoodResult) =>
   r.source === "google" && r.link
     ? r.link
     : `https://www.google.com/maps/search/${encodeURIComponent(r.nativeName || r.name)}/@${r.lat},${r.lng},18z`;
+// In mainland China Google Maps is blocked and knows few restaurants, so the
+// name opens Amap at the restaurant instead.
+const restaurantLink = (r: FoodResult, country: string) =>
+  country === "China"
+    ? `https://uri.amap.com/marker?position=${r.lng},${r.lat}&name=${encodeURIComponent(r.nativeName || r.name)}&coordinate=wgs84&callnative=1`
+    : googleMapsLink(r);
+const linkTitle = (country: string) =>
+  country === "China"
+    ? "Open in Amap"
+    : "Open in Google Maps for reviews and photos";
 // "japanese, ramen" or "Japanese restaurant" → ["japanese", "ramen"].
 // Results without a cuisine are grouped as "other".
 const aliases: Record<string, string> = {
@@ -536,22 +546,23 @@ export function Food({
                         <a
                           className="food-name"
                           href={
+                            p.country !== "China" &&
                             /google\.[a-z.]+\/maps|maps\.app\.goo\.gl/.test(
                               p.evidence,
                             )
                               ? p.evidence
-                              : googleMapsLink({
+                              : restaurantLink({
                                   name: p.name,
                                   nativeName: p.nativeName,
                                   lat: p.lat!,
                                   lng: p.lng!,
                                   link: "",
                                   source: "osm",
-                                } as FoodResult)
+                                } as FoodResult, p.country)
                           }
                           target="_blank"
                           rel="noreferrer"
-                          title="Open in Google Maps for reviews and photos"
+                          title={linkTitle(p.country)}
                         >
                           {p.name}
                           <ExternalLink size={12} />
@@ -639,10 +650,10 @@ export function Food({
                     <div className="food-card-main">
                       <a
                         className="food-name"
-                        href={googleMapsLink(r)}
+                        href={restaurantLink(r, anchor?.country || "")}
                         target="_blank"
                         rel="noreferrer"
-                        title="Open in Google Maps for reviews and photos"
+                        title={linkTitle(anchor?.country || "")}
                       >
                         {r.name}
                         <ExternalLink size={12} />

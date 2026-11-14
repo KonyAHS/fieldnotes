@@ -423,6 +423,10 @@ function LegItem({
     : "";
   const found = result?.state === "done" && result.route.found;
   const between = leg.planned.some((e) => e.scope === "intercity");
+  // Mainland China (not Hong Kong or Macau, which have their own zones).
+  const china = [leg.from.timezone, leg.to.timezone].every(
+    (tz) => tz === "Asia/Shanghai" || tz === "Asia/Urumqi",
+  );
   return (
     <li className={`day-leg ${selected ? "selected" : ""}`}>
       <button
@@ -493,11 +497,11 @@ function LegItem({
         {!between && (
           <a
             className="day-leg-link"
-            href={directionsUrl(leg.from.point, leg.to.point)}
+            href={directionsUrl(leg.from.point, leg.to.point, china)}
             target="_blank"
             rel="noreferrer"
           >
-            Google Maps <ExternalLink size={12} />
+            {china ? "Amap" : "Google Maps"} <ExternalLink size={12} />
           </a>
         )}
       </div>

@@ -722,11 +722,17 @@ export function mapLinks(p: Place, food = false) {
     ? `${p.country === "China" ? "清真餐厅" : p.country === "Korea" ? "할랄 음식점" : "halal restaurants"} ${p.nativeName || p.name} ${p.city}`
     : `${p.nativeName || p.name} ${p.nativeAddress || p.address || p.city}`;
   const encoded = encodeURIComponent(q);
+  // Google Maps has little of mainland China (and is blocked there), so
+  // China gets Amap and Baidu instead.
   const links: { name: string; url: string; app?: AppLink }[] = [
-    {
-      name: "Google Maps",
-      url: `https://www.google.com/maps/search/?api=1&query=${encoded}`,
-    },
+    ...(p.country === "China"
+      ? []
+      : [
+          {
+            name: "Google Maps",
+            url: `https://www.google.com/maps/search/?api=1&query=${encoded}`,
+          },
+        ]),
     {
       name: "OpenStreetMap",
       url: `https://www.openstreetmap.org/search?query=${encoded}`,
@@ -812,7 +818,15 @@ export function openLocalMap(
 // Opening a place in Google Maps and Apple Maps: its own entry, and
 // directions to it. Without a saved place ID each app searches for the name
 // near the place, which opens the entry when there is one clear match.
-export function placeMaps(p: Place) {
+// Mainland China has no Google links (`google`/`googleWay` are undefined):
+// Google Maps is blocked there and knows little of it; Amap replaces it.
+export function placeMaps(p: Place): {
+  google?: string;
+  googleWay?: string;
+  apple: string;
+  appleWay: string;
+  local: LocalMapLink[];
+} {
   const located = p.lat !== null && p.lng !== null;
   const at = located ? `${p.lat},${p.lng}` : "";
   const label = p.nativeName || p.name;
@@ -894,7 +908,14 @@ export function placeMaps(p: Place) {
       wayApp: located ? { ios: route, android: route } : undefined,
     });
   }
-  return { google, googleWay, apple, appleWay, local };
+  const noGoogle = p.country === "China";
+  return {
+    google: noGoogle ? undefined : google,
+    googleWay: noGoogle ? undefined : googleWay,
+    apple,
+    appleWay,
+    local,
+  };
 }
 // Reads a place ID from a Google Maps or Apple Maps link.
 export function placeIdFromLink(link: string): {

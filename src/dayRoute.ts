@@ -274,14 +274,19 @@ export const legWhen = (leg: DayLeg): TransitWhen | null =>
       instant(leg.when.date, leg.when.time, leg.when.tz),
     ).toISOString(),
   };
-export const directionsUrl = (from: Point, to: Point) =>
-  "https://www.google.com/maps/dir/?" +
-  new URLSearchParams({
-    api: "1",
-    origin: `${from[0]},${from[1]}`,
-    destination: `${to[0]},${to[1]}`,
-    travelmode: "transit",
-  });
+// Public transport directions for a stretch: Google Maps, or Amap in
+// mainland China, where Google is blocked and has no transit.
+export const directionsUrl = (from: Point, to: Point, china = false) =>
+  china
+    ? `https://uri.amap.com/navigation?from=${from[1]},${from[0]}&to=${to[1]},${to[0]}` +
+      "&mode=bus&coordinate=wgs84&callnative=1"
+    : "https://www.google.com/maps/dir/?" +
+      new URLSearchParams({
+        api: "1",
+        origin: `${from[0]},${from[1]}`,
+        destination: `${to[0]},${to[1]}`,
+        travelmode: "transit",
+      });
 export class TransitError extends Error {
   constructor(
     message: string,

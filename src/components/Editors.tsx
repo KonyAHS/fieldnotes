@@ -850,14 +850,16 @@ function PlaceCard({
             <Globe size={13} /> Website
           </a>
         )}
-        <a
-          className="text-button"
-          href={maps.google}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <ExternalLink size={13} /> Google Maps
-        </a>
+        {maps.google && (
+          <a
+            className="text-button"
+            href={maps.google}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink size={13} /> Google Maps
+          </a>
+        )}
         <a
           className="text-button"
           href={maps.apple}
@@ -1293,10 +1295,12 @@ export function PlaceEditor({
           />
         </details>
         <div className="map-links">
-          <a href={placeMaps(place).google} target="_blank" rel="noreferrer">
-            Google Maps
-            <ExternalLink size={13} />
-          </a>
+          {placeMaps(place).google && (
+            <a href={placeMaps(place).google} target="_blank" rel="noreferrer">
+              Google Maps
+              <ExternalLink size={13} />
+            </a>
+          )}
           <a href={placeMaps(place).apple} target="_blank" rel="noreferrer">
             Apple Maps
             <ExternalLink size={13} />

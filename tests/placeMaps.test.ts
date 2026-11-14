@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emptyPlace, placeMaps, placeIdFromLink } from "../src/model.ts";
+import { emptyPlace, mapLinks, placeMaps, placeIdFromLink } from "../src/model.ts";
+import { directionsUrl } from "../src/dayRoute.ts";
 
 const base = {
   ...emptyPlace(),
@@ -50,4 +51,17 @@ test("adds Amap for places in mainland China", () => {
   assert.match(m.local[0].place, /^https:\/\/uri\.amap\.com\/marker\?position=114\.0302,22\.6103&.*coordinate=wgs84/);
   assert.match(m.local[0].way!, /^https:\/\/uri\.amap\.com\/navigation\?to=114\.0302,22\.6103,.*mode=bus/);
   assert.deepEqual(placeMaps(base).local, []);
+});
+
+test("leaves Google Maps out in mainland China", () => {
+  const china = { ...base, country: "China", lat: 22.6103, lng: 114.0302, name: "Shenzhen North" };
+  const m = placeMaps(china);
+  assert.equal(m.google, undefined);
+  assert.equal(m.googleWay, undefined);
+  assert.ok(m.apple);
+  assert.ok(!mapLinks(china).some((l) => l.name === "Google Maps"));
+  assert.equal(mapLinks(china)[0].name, "Amap");
+  assert.ok(placeMaps({ ...china, country: "Hong Kong" }).google);
+  assert.match(directionsUrl([22.6, 114.0], [22.5, 114.1], true), /^https:\/\/uri\.amap\.com\/navigation\?from=114,22\.6&to=114\.1,22\.5/);
+  assert.match(directionsUrl([22.6, 114.0], [22.5, 114.1]), /google\.com\/maps\/dir/);
 });

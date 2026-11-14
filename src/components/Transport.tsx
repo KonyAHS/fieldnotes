@@ -84,11 +84,17 @@ function searchLinks(leg: Leg, date: string) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
+  // Google Maps has no public transport inside mainland China.
+  const inChina = leg.fromCountry === "China" && leg.toCountry === "China";
   const links = [
-    {
-      name: "Google Maps",
-      url: `https://www.google.com/maps/dir/?api=1&origin=${from}&destination=${to}&travelmode=transit`,
-    },
+    ...(inChina
+      ? []
+      : [
+          {
+            name: "Google Maps",
+            url: `https://www.google.com/maps/dir/?api=1&origin=${from}&destination=${to}&travelmode=transit`,
+          },
+        ]),
     { name: "Rome2rio", url: `https://www.rome2rio.com/map/${from}/${to}` },
     {
       name: "Google Flights",

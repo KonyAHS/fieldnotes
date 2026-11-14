@@ -89,9 +89,11 @@ function Actions({
       {maps && (
         <span className="today-map-pair" aria-label="Directions">
           <Navigation size={13} /> Directions
-          <a href={maps.googleWay} target="_blank" rel="noreferrer">
-            Google
-          </a>
+          {maps.googleWay && (
+            <a href={maps.googleWay} target="_blank" rel="noreferrer">
+              Google
+            </a>
+          )}
           <a href={maps.appleWay} target="_blank" rel="noreferrer">
             Apple
           </a>
@@ -117,9 +119,11 @@ function Actions({
           title="Open the place's own page in the map app"
         >
           <MapPin size={13} /> Place
-          <a href={maps.google} target="_blank" rel="noreferrer">
-            Google
-          </a>
+          {maps.google && (
+            <a href={maps.google} target="_blank" rel="noreferrer">
+              Google
+            </a>
+          )}
           <a href={maps.apple} target="_blank" rel="noreferrer">
             Apple
           </a>
