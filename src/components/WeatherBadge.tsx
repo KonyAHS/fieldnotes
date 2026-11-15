@@ -9,7 +9,7 @@ import {
   CloudLightning,
 } from "lucide-react";
 import { type Weather, weatherNote } from "../whereabouts";
-function Icon({
+export function WeatherIcon({
   code,
   size,
 }: {
@@ -54,7 +54,7 @@ export function WeatherBadge({
       className={`weather-badge ${typical ? "typical" : ""}`}
       title={weatherNote(w)}
     >
-      <Icon code={w.code} size={size} />
+      <WeatherIcon code={w.code} size={size} />
       {w.tempMax !== null && w.tempMin !== null && (
         <span>
           {typical && "≈"}

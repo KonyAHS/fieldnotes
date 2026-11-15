@@ -18,6 +18,7 @@ import { locator } from "./locator.ts";
 import { maps } from "./maps.ts";
 import { LinkError, resolveMapsLink } from "./mapslink.ts";
 import { agent, toolList, mcpReply, llmsText, AgentError } from "./agent.ts";
+import { weatherWarmer } from "./warm.ts";
 const dataDir = process.env.DATA_DIR || "./data";
 mkdirSync(dataDir, { recursive: true });
 const db = new DatabaseSync(join(dataDir, "fieldnotes.sqlite"));
@@ -54,6 +55,11 @@ setInterval(sweepFiles, 86400000).unref();
 const locations = locator(db, lookup.geocode, () => get().data.places);
 void locations.run();
 setInterval(() => void locations.run(), 10 * 60000).unref();
+// Weather for the days around today is refreshed every two hours, so the
+// app's requests are answered from the cache (forecasts are kept 3 hours).
+const warmWeather = weatherWarmer(() => get().data, lookup.weather);
+setTimeout(() => void warmWeather(), 15000).unref();
+setInterval(() => void warmWeather(), 2 * 3600000).unref();
 const agentTools = agent(
   {
     read: get,

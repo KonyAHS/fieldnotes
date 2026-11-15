@@ -24,6 +24,7 @@ export function Scenarios({
 }) {
   const [editing, setEditing] = useState<Scenario | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [open, setOpen] = useState<string[]>([]);
   const [compare, setCompare] = useState<string[]>(
     trip.scenarios.slice(0, 2).map((s) => s.id),
   );
@@ -67,7 +68,10 @@ export function Scenarios({
             className={`scenario-card ${s.id === trip.activeScenarioId ? "active" : ""}`}
           >
             <div className="scenario-card-top">
-              <h3>{s.name}</h3>
+              <h3>
+                {s.name}
+                <small>{s.entries.length} plans</small>
+              </h3>
               <button
                 className="icon-button"
                 aria-label={`Edit ${s.name}`}
@@ -85,9 +89,46 @@ export function Scenarios({
                 </button>
               )}
             </div>
-            {s.description && <p>{s.description}</p>}
+            {s.description && (
+              <p
+                className={
+                  s.description.length > 240 && !open.includes(s.id)
+                    ? "clamped"
+                    : ""
+                }
+              >
+                {s.description}
+              </p>
+            )}
+            {s.description.length > 240 && (
+              <button
+                className="text-button scenario-more"
+                onClick={() =>
+                  setOpen((v) =>
+                    v.includes(s.id)
+                      ? v.filter((id) => id !== s.id)
+                      : [...v, s.id],
+                  )
+                }
+              >
+                {open.includes(s.id) ? "Show less" : "Show more"}
+              </button>
+            )}
             <div className="scenario-card-bottom">
-              <span>{s.entries.length} plans</span>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={compare.includes(s.id)}
+                  onChange={(e) =>
+                    setCompare((v) =>
+                      e.target.checked
+                        ? [...v, s.id]
+                        : v.filter((id) => id !== s.id),
+                    )
+                  }
+                />
+                Compare
+              </label>
               <button
                 className={`button ${s.id === trip.activeScenarioId ? "active-button" : ""}`}
                 onClick={() => onSelect(s)}
@@ -102,20 +143,6 @@ export function Scenarios({
                 )}
               </button>
             </div>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={compare.includes(s.id)}
-                onChange={(e) =>
-                  setCompare((v) =>
-                    e.target.checked
-                      ? [...v, s.id]
-                      : v.filter((id) => id !== s.id),
-                  )
-                }
-              />
-              Compare
-            </label>
           </article>
         ))}
       </div>

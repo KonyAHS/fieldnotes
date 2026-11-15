@@ -345,7 +345,7 @@ export function Hotels({
       <aside className="hotels-map" ref={map}>
         <div className="hotels-map-head">
           <strong>{mapTitle}</strong>
-          <div className="segmented">
+          <div className="segmented" hidden={!shown}>
             <button
               className={view.kind === "all" ? "selected" : ""}
               onClick={() => setView({ kind: "all" })}

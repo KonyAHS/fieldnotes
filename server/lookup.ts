@@ -105,6 +105,9 @@ export type Weather = {
   sunset: string;
   /** WMO weather code (0 clear … 95+ thunderstorm), for an icon. */
   code?: number | null;
+  /** Local hours 0–23: temperature, rain (chance in % for forecasts, else
+      mm) and weather code. */
+  hours?: { temp: number | null; rain: number | null; code: number | null }[];
 };
 function queue() {
   let last = Promise.resolve();
@@ -131,11 +134,13 @@ export function lookups(
     key: string,
     ttl: number | ((value: T) => number),
     load: () => Promise<T>,
+    // Skip the stored copy and replace it (a failed load keeps the old one).
+    fresh = false,
   ) {
     const row = db
       .prepare("SELECT value, created_at FROM lookup_cache WHERE key=?")
       .get(key) as { value: string; created_at: number } | undefined;
-    if (row) {
+    if (row && !fresh) {
       const value = JSON.parse(row.value) as T;
       const keep = typeof ttl === "function" ? ttl(value) : ttl;
       if (Date.now() - row.created_at < keep) return value;
@@ -459,6 +464,7 @@ export function lookups(
     lat: number,
     lng: number,
     date: string,
+    fresh = false,
   ): Promise<Weather> {
     const today = new Date().toISOString().slice(0, 10);
     const daysAhead = (Date.parse(date) - Date.parse(today)) / day;
@@ -474,54 +480,74 @@ export function lookups(
       : lookup === date
         ? "observed"
         : "last-year";
-    const key = `weather2:${lat.toFixed(2)},${lng.toFixed(2)}:${lookup}:${source}`;
-    return cached(key, forecast ? 3 * 3600000 : 30 * day, async () => {
-      const daily = forecast
-        ? "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset"
-        : "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset";
-      const params = new URLSearchParams({
-        latitude: lat.toFixed(4),
-        longitude: lng.toFixed(4),
-        daily,
-        timezone: "auto",
-        start_date: lookup,
-        end_date: lookup,
-      });
-      const res = await fetch(
-        (forecast
-          ? "https://api.open-meteo.com/v1/forecast?"
-          : "https://archive-api.open-meteo.com/v1/archive?") + params,
-        {
-          headers: { "User-Agent": agent },
-          signal: AbortSignal.timeout(20000),
-        },
-      );
-      if (!res.ok) throw Error(`Open-Meteo ${res.status}`);
-      const d = (await res.json()).daily as Record<
-        string,
-        (number | string | null)[]
-      >;
-      const num = (k: string) =>
-        typeof d[k]?.[0] === "number" ? (d[k][0] as number) : null;
-      const time = (k: string) => String(d[k]?.[0] || "").slice(11, 16);
-      return {
-        source,
-        date: lookup,
-        tempMax: num("temperature_2m_max"),
-        tempMin: num("temperature_2m_min"),
-        rain: forecast
-          ? num("precipitation_probability_max") === null
-            ? ""
-            : `${num("precipitation_probability_max")}% chance of rain`
-          : num("precipitation_sum") === null
-            ? ""
-            : `${num("precipitation_sum")} mm rain`,
-        windMax: num("wind_speed_10m_max"),
-        sunrise: time("sunrise"),
-        sunset: time("sunset"),
-        code: num("weather_code"),
-      };
-    });
+    const key = `weather3:${lat.toFixed(2)},${lng.toFixed(2)}:${lookup}:${source}`;
+    return cached(
+      key,
+      forecast ? 3 * 3600000 : 30 * day,
+      async () => {
+        const daily = forecast
+          ? "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset"
+          : "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset";
+        const params = new URLSearchParams({
+          latitude: lat.toFixed(4),
+          longitude: lng.toFixed(4),
+          daily,
+          hourly: forecast
+            ? "temperature_2m,precipitation_probability,weather_code"
+            : "temperature_2m,precipitation,weather_code",
+          timezone: "auto",
+          start_date: lookup,
+          end_date: lookup,
+        });
+        const res = await fetch(
+          (forecast
+            ? "https://api.open-meteo.com/v1/forecast?"
+            : "https://archive-api.open-meteo.com/v1/archive?") + params,
+          {
+            headers: { "User-Agent": agent },
+            signal: AbortSignal.timeout(20000),
+          },
+        );
+        if (!res.ok) throw Error(`Open-Meteo ${res.status}`);
+        const data = await res.json();
+        const d = data.daily as Record<string, (number | string | null)[]>;
+        const h = (data.hourly || {}) as Record<string, (number | null)[]>;
+        const at = (k: string, i: number) =>
+          typeof h[k]?.[i] === "number" ? (h[k][i] as number) : null;
+        const hours = Array.isArray(h.temperature_2m)
+          ? Array.from({ length: 24 }, (_, i) => ({
+              temp: at("temperature_2m", i),
+              rain: at(
+                forecast ? "precipitation_probability" : "precipitation",
+                i,
+              ),
+              code: at("weather_code", i),
+            }))
+          : undefined;
+        const num = (k: string) =>
+          typeof d[k]?.[0] === "number" ? (d[k][0] as number) : null;
+        const time = (k: string) => String(d[k]?.[0] || "").slice(11, 16);
+        return {
+          source,
+          date: lookup,
+          tempMax: num("temperature_2m_max"),
+          tempMin: num("temperature_2m_min"),
+          rain: forecast
+            ? num("precipitation_probability_max") === null
+              ? ""
+              : `${num("precipitation_probability_max")}% chance of rain`
+            : num("precipitation_sum") === null
+              ? ""
+              : `${num("precipitation_sum")} mm rain`,
+          windMax: num("wind_speed_10m_max"),
+          sunrise: time("sunrise"),
+          sunset: time("sunset"),
+          code: num("weather_code"),
+          hours,
+        };
+      },
+      fresh,
+    );
   }
   async function nearby(
     lat: number,

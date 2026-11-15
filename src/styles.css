@@ -286,24 +286,6 @@ textarea::placeholder {
   align-items: center;
   gap: 24px;
 }
-.breadcrumb {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.breadcrumb span {
-  opacity: 0.5;
-}
-.avatar {
-  width: 31px;
-  height: 31px;
-  border-radius: 50%;
-  background: var(--clay-soft);
-  color: var(--clay);
-  font-family: Georgia, serif;
-  font-size: 15px;
-}
 .save-status {
   display: flex;
   align-items: center;
@@ -320,46 +302,6 @@ textarea::placeholder {
   padding: 38px 36px 60px;
   max-width: 1850px;
   margin: auto;
-}
-.page-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  gap: 20px;
-}
-.country-labels {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--clay);
-  text-transform: uppercase;
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 1.7px;
-  margin-bottom: 12px;
-}
-.country-labels span + span:before {
-  content: "·";
-  margin-right: 10px;
-  color: var(--muted);
-}
-.trip-dates {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 14px;
-}
-.date-divider {
-  height: 11px;
-  border-left: 1px solid var(--line);
-  margin: 0 3px;
-}
-.edit-dates {
-  margin-left: 4px;
-  font-size: 11px !important;
 }
 .button {
   display: inline-flex;
@@ -523,19 +465,6 @@ textarea::placeholder {
   background: var(--bg);
   max-width: 130px;
 }
-.legend-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  margin-left: 8px;
-}
-.legend-dot.activity {
-  background: var(--activity-line);
-}
-.legend-dot.transport {
-  background: var(--transport-line);
-}
 /* The page scrolls vertically; only very wide ranges scroll sideways. */
 .timeline-scroll {
   overflow-x: auto;
@@ -652,10 +581,6 @@ textarea::placeholder {
 .empty-stay,
 .night-transit {
   z-index: 1;
-}
-.legend-dot.weekend {
-  background: var(--weekend);
-  outline: 1px solid var(--line);
 }
 .range-picker {
   margin-left: 6px;
@@ -5942,4 +5867,1124 @@ body:has(.route-ghost) {
   height: auto;
   min-height: 36px;
   max-width: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   Header: the page name lives in the top bar (one name per page, the same as
+   in the sidebar) with the page's actions beside it. Phones show the actions
+   as one row under the bar.
+   ------------------------------------------------------------------------ */
+.topbar {
+  height: 64px;
+  gap: 14px;
+}
+.topbar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  min-width: 0;
+}
+.topbar h1 {
+  font-size: 26px;
+  letter-spacing: -0.6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trip-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 0;
+}
+.trip-meta span + span:before {
+  content: "·";
+  margin-right: 8px;
+  opacity: 0.6;
+}
+.trip-meta svg {
+  opacity: 0.55;
+  flex: none;
+}
+.trip-meta:hover {
+  color: var(--text);
+}
+.trip-countries {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.topbar .heading-actions {
+  margin-right: 6px;
+}
+.phone-actions {
+  display: none;
+}
+.page-content {
+  padding-top: 24px;
+}
+@media (max-width: 1500px) {
+  .topbar .trip-countries {
+    display: none;
+  }
+}
+@media (max-width: 1250px) {
+  .topbar .trip-meta {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .topbar {
+    height: 54px;
+    gap: 8px;
+  }
+  .topbar-title {
+    flex: 1;
+  }
+  .topbar h1 {
+    font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+  .topbar > .spacer,
+  .topbar .plan-actions {
+    display: none;
+  }
+  /* A page's single secondary action becomes an icon beside the title. */
+  .topbar .heading-actions .button {
+    font-size: 0;
+    gap: 0;
+    padding: 8px;
+    border-color: transparent;
+    background: transparent;
+  }
+  .topbar .heading-actions .button svg {
+    width: 19px;
+    height: 19px;
+  }
+  .save-status.saved span {
+    display: none;
+  }
+  .page-content {
+    padding-top: 14px;
+  }
+  .phone-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .phone-actions .trip-meta {
+    font-size: 12px;
+  }
+  .phone-actions .trip-countries {
+    display: none;
+  }
+  .wide-only {
+    display: none;
+  }
+}
+
+/* Itinerary on phones: scenario, checks and the view switch share one row;
+   the category chips scroll sideways instead of stacking three rows deep. */
+@media (max-width: 700px) {
+  .plan-toolbar {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding-bottom: 10px;
+  }
+  .gaps-summary {
+    margin-left: 0;
+    flex: none;
+  }
+  .view-picker {
+    width: auto;
+    flex: none;
+  }
+  .view-picker button {
+    flex: none;
+    padding: 7px 10px;
+  }
+  .view-picker button span {
+    display: none;
+  }
+  .kind-filter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -16px 12px;
+    padding: 2px 16px;
+    white-space: nowrap;
+  }
+  .kind-filter::-webkit-scrollbar {
+    display: none;
+  }
+  .kind-filter > * {
+    flex: none;
+  }
+  .kind-filter > .booking-legend {
+    margin-left: 6px;
+  }
+  .agenda-entries .event-card {
+    min-height: 0;
+  }
+}
+
+/* Today: on wide screens the day's facts and hotel stay in view on the left
+   while the plans scroll on the right, instead of one narrow column. */
+.today-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (min-width: 1200px) {
+  .today-view {
+    max-width: 1320px;
+    display: grid;
+    grid-template-columns: minmax(380px, 460px) minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+  }
+  .today-side {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  .today-plans h3 {
+    margin-top: 0;
+  }
+}
+@media (max-width: 700px) {
+  .today-date h2 {
+    font-size: 24px;
+    margin: 0;
+  }
+  .today-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .today-fact {
+    flex: 1 1 130px;
+    padding: 8px 10px;
+  }
+  .today-prayers {
+    flex-basis: 100%;
+    order: 3;
+    justify-content: space-around;
+  }
+}
+
+/* Today's facts wrap by content: weather and qibla share a row when the
+   prayer times need the full width. */
+.today-facts {
+  display: flex;
+  flex-wrap: wrap;
+}
+.today-fact {
+  flex: 1 1 140px;
+}
+.today-qibla {
+  flex-basis: 100px;
+}
+.today-prayers {
+  flex-basis: 210px;
+  order: 3;
+  justify-content: space-around;
+}
+
+/* Hotels on phones: the next hotel first, then the map, then the list. */
+@media (max-width: 900px) {
+  .hotels-view {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .hotels-list {
+    display: contents;
+  }
+  .next-hotel {
+    order: -2;
+  }
+  .hotels-map iframe {
+    height: 36vh;
+  }
+}
+
+/* Places: filters fold away on phones; quieter helper rows and counts. */
+.places-toolbar {
+  margin-bottom: 14px;
+}
+.places-filters {
+  display: contents;
+}
+.filters-toggle {
+  display: none;
+}
+.filters-toggle small {
+  background: var(--green);
+  color: var(--paper);
+  border-radius: 999px;
+  min-width: 17px;
+  padding: 1px 5px;
+  font-size: 10px;
+}
+.phone-fill {
+  padding: 5px 6px 5px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.phone-fill .button {
+  padding: 5px 10px;
+  font-size: 11.5px;
+  min-height: 0;
+}
+.list-heading {
+  margin: 12px 0 10px;
+}
+.list-heading > span {
+  border: 0;
+  padding: 0;
+}
+.place-actions {
+  gap: 6px 14px;
+}
+@media (max-width: 700px) {
+  .filters-toggle {
+    display: inline-flex;
+  }
+  .places-filters {
+    display: none;
+    order: 5;
+    flex-basis: 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .places-filters.open {
+    display: grid;
+  }
+  .places-filters select {
+    max-width: none;
+    width: 100%;
+  }
+  .phone-fill {
+    flex-wrap: nowrap;
+  }
+  .phone-fill .button {
+    flex: none;
+  }
+}
+
+/* Scenarios: long descriptions fold; compare sits with the card's footer. */
+.scenario-card {
+  gap: 12px;
+}
+.scenario-card > p.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.scenario-more {
+  align-self: flex-start;
+  margin-top: -8px;
+  font-size: 11px;
+}
+.scenario-card-bottom {
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.scenario-card-bottom .check-field {
+  margin-right: auto;
+  color: var(--muted);
+}
+
+/* Checklist: an unset due date is a quiet icon until the row is hovered. */
+.task-due.unset span {
+  display: none;
+}
+@media (hover: hover) {
+  .task-row:hover .task-due.unset span {
+    display: inline;
+  }
+}
+@media (max-width: 700px) {
+  .tasks .task-row {
+    column-gap: 8px;
+  }
+  .task-toolbar {
+    gap: 8px;
+  }
+  .task-add {
+    min-width: 0;
+    flex: 1 1 150px;
+  }
+}
+
+.segmented[hidden] {
+  display: none;
+}
+.scenario-card-top h3 small {
+  display: block;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.scenario-card-top {
+  align-items: flex-start;
+}
+.next-hotel {
+  min-width: 0;
+}
+.next-actions .button {
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
+}
+.topbar-title h1 {
+  flex: 0 1 auto;
+  min-width: 3ch;
+}
+.topbar .trip-meta {
+  flex: 0 100 auto;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+   Today: every card has the same shape. A title block, then one row of six
+   actions that never move, then details that open on demand.
+   ------------------------------------------------------------------------ */
+.today-plan.event-card,
+.today-hotel {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.today-plan-head,
+.today-title {
+  padding: 11px 13px 10px;
+  gap: 5px;
+  width: 100%;
+}
+.today-checkout {
+  padding: 9px 13px 0;
+}
+.today-plan-head strong {
+  font-size: 14.5px;
+  line-height: 1.3;
+}
+.today-sub {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.act-bar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  width: 100%;
+  border-top: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+}
+.act {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 2px 7px;
+  min-height: 48px;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 0;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+.act small {
+  font-size: 10px;
+  letter-spacing: 0.1px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.act svg {
+  transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.act.off {
+  cursor: default;
+  opacity: 0.22;
+}
+.act.on {
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  color: var(--green);
+}
+.act.more.on svg {
+  transform: rotate(180deg);
+}
+.act:not(.off):active {
+  transform: scale(0.94);
+}
+@media (hover: hover) {
+  .act:not(.off):hover {
+    background: color-mix(in srgb, var(--green) 8%, transparent);
+  }
+  .act:not(.off):not(.more):hover svg {
+    transform: translateY(-2px);
+  }
+}
+.act-menu {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 8px 13px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+  animation: unfold 0.18s ease-out;
+}
+.act-menu a {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+}
+.today-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 13px 12px;
+  border-top: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+  animation: unfold 0.2s ease-out;
+}
+.today-details .today-address {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.today-details .today-address svg {
+  flex: none;
+  margin-top: 2px;
+}
+.today-notes {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.today-plan.done {
+  opacity: 0.6;
+}
+.today-plan.now .today-badge {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+.today-earlier {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+}
+.today-earlier svg {
+  flex: none;
+}
+.today-earlier span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+  font-size: 11.5px;
+}
+.today-nav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.today-nav button,
+.today-nav-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.today-nav button > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.today-nav small {
+  font-size: 10.5px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.today-nav em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.today-nav-next {
+  border-color: var(--green) !important;
+  background: var(--green-soft) !important;
+}
+.today-nav-next svg,
+.today-nav-prev svg {
+  flex: none;
+  transition: transform 0.2s;
+}
+.today-nav button:disabled {
+  opacity: 0.35;
+}
+.today-nav button:not(:disabled):active {
+  transform: scale(0.98);
+}
+.today-nav-end {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 13px;
+  justify-content: center;
+}
+@media (hover: hover) {
+  .today-nav-next:hover svg {
+    transform: translateX(3px);
+  }
+  .today-nav-prev:not(:disabled):hover svg {
+    transform: translateX(-3px);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion. Small and quick: things slide a few pixels into place, icons
+   nudge, presses give. All of it is off under "reduce motion".
+   ------------------------------------------------------------------------ */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes day-next {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+@keyframes day-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes wiggle {
+  25% {
+    transform: rotate(-9deg);
+  }
+  60% {
+    transform: rotate(7deg);
+  }
+  85% {
+    transform: rotate(-3deg);
+  }
+}
+@keyframes pop {
+  40% {
+    transform: scale(1.25);
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.page-content {
+  animation: page-in 0.22s ease-out;
+}
+.day-next {
+  animation: day-next 0.22s ease-out;
+}
+.day-prev {
+  animation: day-prev 0.22s ease-out;
+}
+.modal[open] {
+  animation: modal-in 0.2s ease-out;
+}
+.modal[open]::backdrop {
+  animation: fade-in 0.2s ease-out;
+}
+.button,
+.icon-button,
+.nav-button,
+.kind-chip,
+.text-button {
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.12s;
+}
+.button:active,
+.kind-chip:active,
+.nav-button:active {
+  transform: scale(0.97);
+}
+.icon-button:active {
+  transform: scale(0.9);
+}
+.nav-button svg {
+  transition: transform 0.2s;
+}
+.nav-button.active svg {
+  animation: wiggle 0.45s ease-out;
+}
+.task-star.on svg,
+.kind-chip.on svg {
+  animation: pop 0.3s ease-out;
+}
+.segmented button {
+  transition:
+    background 0.18s,
+    color 0.18s,
+    box-shadow 0.18s;
+}
+.place-card,
+.hotel-card,
+.scenario-card,
+.leg-card,
+.today-fact {
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+details[open] > summary ~ * {
+  animation: unfold 0.2s ease-out;
+}
+.places-filters.open,
+.notice {
+  animation: unfold 0.2s ease-out;
+}
+@media (hover: hover) {
+  .nav-button:hover svg {
+    transform: translateX(2px);
+  }
+  .place-card:hover,
+  .scenario-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px -10px #0006;
+  }
+  .button.primary:hover svg {
+    animation: wiggle 0.45s ease-out;
+  }
+}
+
+/* A card with nothing to open but its details keeps only the chevron, in
+   its usual spot. */
+.act-bar.bare .act.off {
+  visibility: hidden;
+}
+.act-bar.bare .act {
+  min-height: 28px;
+  padding: 3px 2px;
+}
+.act-bar.bare .act small {
+  display: none;
+}
+.act-bar.bare {
+  background: none;
+  border-top: 0;
+  margin-top: -30px;
+  pointer-events: none;
+}
+.act-bar.bare .act.more {
+  pointer-events: auto;
+  margin-bottom: 4px;
+}
+.today-notes {
+  position: relative;
+  color: var(--muted);
+}
+.today-notes.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+.today-notes > span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--green);
+  cursor: pointer;
+}
+.today-notes.clamped > span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding-left: 28px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--fade, var(--paper)) 26px
+  );
+}
+.today-plan {
+  --fade: var(--activity);
+}
+.today-plan.event-transport {
+  --fade: var(--transport);
+}
+.today-plan.event-food {
+  --fade: var(--food);
+}
+.today-plan.event-note {
+  --fade: var(--clay-soft);
+}
+.today-hotel {
+  --fade: var(--green-soft);
+}
+.today-plan:has(.act-bar.bare) .today-plan-head strong {
+  padding-right: 42px;
+}
+
+/* Today, top of the page: the day's weather with the hours ahead, then one
+   slim line for prayer times and qibla. */
+.today-facts {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.today-weather {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.today-weather-now {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.today-weather-now .weather-badge {
+  font-size: 19px;
+}
+.today-weather-now small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.today-hours {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
+}
+.today-hours > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 0;
+  border-radius: 7px;
+  color: var(--text);
+}
+.today-hours > span.now {
+  background: var(--green-soft);
+}
+.today-hours small {
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.today-hours strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.today-hours em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.7;
+  min-height: 12px;
+}
+.today-hours em.wet {
+  color: #3d7ab8;
+  opacity: 1;
+  font-weight: 600;
+}
+.today-sun {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.today-sun > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.today-sun svg {
+  color: var(--clay);
+}
+.today-sun .today-qibla {
+  flex: none;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  gap: 5px;
+}
+.today-sun .today-qibla svg {
+  color: var(--green);
+}
+/* Weather on a plan: at the right of its time line. */
+.today-plan .event-top {
+  width: 100%;
+}
+.today-wx {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.today-wx b {
+  color: #3d7ab8;
+  font-weight: 600;
+  margin-left: 2px;
+}
+.today-plan[class*="booking-"] .today-wx {
+  margin-right: 14px;
+}
+/* The action row keeps the same space at both ends. */
+.act-bar {
+  padding: 0 6px;
+}
+.act small {
+  font-size: 9.5px;
+}
+/* Details: local name, one line of address, then chips. */
+.today-details .local-name {
+  padding: 4px 8px;
+}
+.today-copyline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: left;
+}
+.today-copyline span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.today-copyline svg {
+  flex: none;
+}
+.today-chip.on {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+}
+.today-details .today-notes {
+  animation: unfold 0.2s ease-out;
+  padding: 0 8px;
+}
+
+/* Driver card: one calm sheet to hold up, then help for you underneath. */
+.driver-card {
+  border: 1px solid #1113;
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  text-align: center;
+  box-shadow: 0 6px 22px -14px #0007;
+}
+.driver-card p {
+  margin: 0;
+}
+.driver-intro,
+.driver-thanks {
+  font-size: 18px;
+  color: #444;
+}
+.driver-place {
+  font-size: 38px;
+  line-height: 1.2;
+  margin: 12px 0 14px !important;
+}
+.driver-address {
+  font-size: 19px;
+  padding: 12px 0;
+  margin-bottom: 12px !important;
+  border-top: 1px solid #1112;
+  border-bottom: 1px solid #1112;
+}
+.driver-address small {
+  display: block;
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 3px;
+}
+.driver-phrase {
+  font-size: 40px;
+  line-height: 1.25;
+  padding: 18px 0;
+}
+.driver-copy {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.driver-help {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.driver-reading {
+  font-size: 15px;
+  line-height: 1.45;
+}
+.driver-english {
+  font-size: 13px;
+}
+.driver-phrases {
+  display: block;
+  margin-top: 14px;
+}
+.driver-phrases > small {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-size: 11px;
+}
+.driver-phrases > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.driver-say {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: left;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.12s;
+}
+.driver-say.on {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 600;
+}
+.driver-say:active {
+  transform: scale(0.97);
+}
+@media (max-width: 700px) {
+  .driver-place {
+    font-size: 33px;
+  }
+  .driver-phrase {
+    font-size: 34px;
+  }
+}
+.act.on {
+  border-radius: 7px;
 }

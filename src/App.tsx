@@ -45,7 +45,7 @@ import {
   StickyNote,
   Bus,
   Map as MapIcon,
-  UserRound,
+  Pencil,
 } from "lucide-react";
 import {
   useWorkspace,
@@ -216,9 +216,6 @@ function Preparation({
     .sort((a, b) => a.refundDeadline.localeCompare(b.refundDeadline));
   return (
     <div className="preparation-view">
-      <div className="section-actions">
-        <h2>Checklist</h2>
-      </div>
       <Suspense fallback={opening}>
         <TaskList trip={trip} onEditTask={onEditTask} />
       </Suspense>
@@ -713,28 +710,64 @@ export default function App() {
         `Moved “${e.title}” to ${weekday(date)} ${shortDate(date)} ${time}`,
       );
   }
+  // One name per page: the sidebar label (the itinerary is named after the trip).
   const title =
     tab === "plan"
       ? trip.name
-      : tab === "today"
-        ? "Today"
-        : tab === "transport"
-          ? "Getting between cities"
-          : tab === "hotels"
-            ? "Where you sleep"
-            : tab === "places"
-              ? "Places"
-              : tab === "food"
-                ? "Restaurants near your plans"
-                : tab === "outdoors"
-                  ? "Trails and rides near your plans"
-                  : tab === "scenarios"
-                    ? "A little room for possibility"
-                    : tab === "preparation"
-                      ? "Before you go"
-                      : tab === "visa"
-                        ? "Visa itineraries"
-                        : "Make it yours";
+      : navigation.find((n) => n.id === tab)?.name || "Settings";
+  const tripMeta = tab === "plan" && (
+    <button
+      className="trip-meta"
+      title="Edit trip name, dates and countries"
+      onClick={() => setEditor({ kind: "trip", trip })}
+    >
+      <span>
+        {shortDate(trip.start)} – {shortDate(trip.end)} {trip.start.slice(0, 4)}
+      </span>
+      <span>{days(trip.start, trip.end).length} days</span>
+      {activeCountries.length > 0 && (
+        <span className="trip-countries">{activeCountries.join(" · ")}</span>
+      )}
+      <Pencil size={12} aria-label="Edit trip" />
+    </button>
+  );
+  const pageActions = (
+    <>
+      {tab === "plan" && (
+        <button className="button" onClick={() => setSharing(true)}>
+          <Share2 size={16} />
+          Share
+        </button>
+      )}
+      {tab === "plan" && (
+        <button
+          className="button"
+          title="Add to Apple, Google or Outlook calendar"
+          onClick={() => setExporting(true)}
+        >
+          <CalendarPlus size={16} />
+          Calendar
+        </button>
+      )}
+      {(tab === "hotels" || tab === "food" || tab === "places") && (
+        <button
+          className="button"
+          title="Make a Google My Maps map you can open in Google Maps"
+          onClick={() => setMapsList(true)}
+        >
+          <MapIcon size={16} />
+          Google Maps list
+        </button>
+      )}
+      {tab === "plan" && (
+        <button className="button primary" onClick={() => add()}>
+          <Plus size={17} />
+          Add plan
+        </button>
+      )}
+    </>
+  );
+  const hasActions = ["plan", "hotels", "food", "places"].includes(tab);
   const SaveIcon =
     state.status === "saved"
       ? CloudCheck
@@ -882,11 +915,18 @@ export default function App() {
           >
             <Menu size={21} />
           </button>
-          <div className="breadcrumb">
-            My trips<span>/</span>
-            {navigation.find((n) => n.id === tab)?.name || "Settings"}
+          <div className="topbar-title">
+            <h1>{title}</h1>
+            {tripMeta}
           </div>
           <div className="spacer" />
+          {hasActions && (
+            <div
+              className={`heading-actions ${tab === "plan" ? "plan-actions" : ""}`}
+            >
+              {pageActions}
+            </div>
+          )}
           <div className="history-buttons">
             <button
               className="icon-button"
@@ -924,81 +964,16 @@ export default function App() {
                 ["saving", "syncing"].includes(state.status) ? "spin" : ""
               }
             />
-            {statusLabel}
-          </button>
-          <button
-            className="avatar"
-            aria-label="Trip settings"
-            onClick={() => setEditor({ kind: "trip", trip })}
-          >
-            {trip.applicant ? (
-              trip.applicant.charAt(0).toUpperCase()
-            ) : (
-              <UserRound size={17} />
-            )}
+            <span>{statusLabel}</span>
           </button>
         </header>
-        <div className="page-content">
-          <div className="page-heading">
-            <div>
-              {tab === "plan" && (
-                <div className="country-labels">
-                  {activeCountries.map((c) => (
-                    <span key={c}>{c}</span>
-                  ))}
-                </div>
-              )}
-              <h1>{title}</h1>
-              {tab === "plan" && (
-                <div className="trip-dates">
-                  {shortDate(trip.start)} — {shortDate(trip.end)}{" "}
-                  {trip.start.slice(0, 4)}
-                  <span className="date-divider" />{" "}
-                  {days(trip.start, trip.end).length} days
-                  <button
-                    className="text-button edit-dates"
-                    onClick={() => setEditor({ kind: "trip", trip })}
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
+        <div className="page-content" key={tab}>
+          {tab === "plan" && (
+            <div className="phone-actions">
+              {tripMeta}
+              <div className="heading-actions">{pageActions}</div>
             </div>
-            <div className="heading-actions">
-              {tab === "plan" && (
-                <button className="button" onClick={() => setSharing(true)}>
-                  <Share2 size={16} />
-                  Share
-                </button>
-              )}
-              {tab === "plan" && (
-                <button
-                  className="button"
-                  title="Add to Apple, Google or Outlook calendar"
-                  onClick={() => setExporting(true)}
-                >
-                  <CalendarPlus size={16} />
-                  Calendar
-                </button>
-              )}
-              {(tab === "hotels" || tab === "food" || tab === "places") && (
-                <button
-                  className="button"
-                  title="Make a Google My Maps map you can open in Google Maps"
-                  onClick={() => setMapsList(true)}
-                >
-                  <MapIcon size={16} />
-                  Google Maps list
-                </button>
-              )}
-              {tab === "plan" && (
-                <button className="button primary" onClick={() => add()}>
-                  <Plus size={17} />
-                  Add plan
-                </button>
-              )}
-            </div>
-          </div>
+          )}
           {(state.status === "error" || state.status === "conflict") && (
             <div className="notice error" role="alert">
               <AlertTriangle size={17} />
@@ -1064,9 +1039,14 @@ export default function App() {
                     <Check size={15} />
                   )}
                   <span>
-                    {issues.length
-                      ? `${issues.length} things to check`
-                      : "All connected"}
+                    {issues.length ? (
+                      <>
+                        {issues.length}
+                        <span className="wide-only"> things to check</span>
+                      </>
+                    ) : (
+                      "All connected"
+                    )}
                   </span>
                 </button>
                 <div className="segmented view-picker">
@@ -1075,14 +1055,14 @@ export default function App() {
                     onClick={() => setView("timeline")}
                   >
                     <LayoutGrid size={15} />
-                    Timeline
+                    <span>Timeline</span>
                   </button>
                   <button
                     className={view === "agenda" ? "selected" : ""}
                     onClick={() => setView("agenda")}
                   >
                     <List size={15} />
-                    Agenda
+                    <span>Agenda</span>
                   </button>
                 </div>
               </div>

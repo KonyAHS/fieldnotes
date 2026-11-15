@@ -882,12 +882,6 @@ export function Timeline({
               }
             }}
           />
-          <span className="legend-dot activity" />
-          Activities
-          <span className="legend-dot transport" />
-          Travel
-          <span className="legend-dot weekend" />
-          Weekend
           <div className="zoom-controls">
             <button
               className="icon-button"

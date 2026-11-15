@@ -228,7 +228,7 @@ export function TaskList({
               onClick={() => setDating(t.id)}
             >
               <CalendarDays size={12} />
-              {t.due ? dueText(t.due, today) : "Set due date"}
+              {t.due ? dueText(t.due, today) : <span>Set due date</span>}
             </button>
           )}
           {safeUrl(t.url) && (

@@ -99,6 +99,8 @@ export type Weather = {
   sunrise: string;
   sunset: string;
   code?: number | null;
+  /** Local hours 0–23: rain is a chance in % for forecasts, else mm. */
+  hours?: { temp: number | null; rain: number | null; code: number | null }[];
 };
 // Weather per place and date, fetched a few at a time and kept for the
 // session (the server caches forecasts for 3 hours, past weather for 30 days).

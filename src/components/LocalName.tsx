@@ -7,7 +7,7 @@ import {
   Copy,
   Languages,
   LoaderCircle,
-  ChevronLeft,
+  MapPin,
 } from "lucide-react";
 import type { Place } from "../model";
 import {
@@ -165,6 +165,10 @@ const airport = (p: Place) =>
 const station = (p: Place) =>
   p.kind === "station" || /station|站|駅|역/i.test(`${p.name} ${p.nativeName}`);
 
+// Whether a driver card can be made for a place.
+export const canShowDriver = (place: Place | undefined): place is Place =>
+  !!place && !!localLanguage(place.country) && hasLocal(place);
+
 // A button that opens the driver card for a place in a country whose
 // language is known and whose local name or address is saved.
 export function DriverButton({ place }: { place: Place | undefined }) {
@@ -180,6 +184,23 @@ export function DriverButton({ place }: { place: Place | undefined }) {
   );
 }
 
+function CopyChip({ text, label }: { text: string; label: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      className="today-chip"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(() => {
+          setDone(true);
+          setTimeout(() => setDone(false), 1500);
+        });
+      }}
+    >
+      {done ? <Check size={13} /> : <Copy size={13} />}
+      {done ? "Copied" : label}
+    </button>
+  );
+}
 // A large-print message for a taxi driver: where to go, in the local
 // language, with the pronunciation and an English translation underneath.
 // Other phrases ("stop here", "how much?") can be shown in its place.
@@ -209,22 +230,29 @@ export function DriverCard({
           <>
             <p className="driver-intro">{lang.intro.native}</p>
             {name && <p className="driver-place">{name}</p>}
-            {where && (
-              <p className="driver-address">
-                {lang.address.native}：{where}
-              </p>
-            )}
             {!name && !where && (
               <p className="driver-place" lang="en">
                 {place.name}
+              </p>
+            )}
+            {where && (
+              <p className="driver-address">
+                <small>{lang.address.native}</small>
+                {where}
               </p>
             )}
             <p className="driver-thanks">{lang.thanks.native}</p>
           </>
         )}
       </div>
+      {!phrase && (name || where) && (
+        <div className="driver-copy" lang="en">
+          {name && <CopyChip text={name} label="Copy name" />}
+          {where && <CopyChip text={where} label="Copy address" />}
+        </div>
+      )}
       <div className="driver-help" lang="en">
-        <small>{lang.name} · say it</small>
+        <small>Say it · {lang.name}</small>
         {phrase ? (
           <>
             <p className="driver-reading">{phrase.reading}</p>
@@ -243,20 +271,24 @@ export function DriverCard({
         )}
       </div>
       <div className="driver-phrases" lang="en">
-        {phrase && (
-          <button className="button" onClick={() => setPhrase(null)}>
-            <ChevronLeft size={15} /> Destination
-          </button>
-        )}
-        {extras.map((x) => (
+        <small>Other things to say</small>
+        <div>
           <button
-            key={x.native}
-            className={`button ${phrase === x ? "primary" : ""}`}
-            onClick={() => setPhrase(x)}
+            className={`driver-say ${phrase ? "" : "on"}`}
+            onClick={() => setPhrase(null)}
           >
-            {x.english}
+            <MapPin size={14} /> Destination
           </button>
-        ))}
+          {extras.map((x) => (
+            <button
+              key={x.native}
+              className={`driver-say ${phrase === x ? "on" : ""}`}
+              onClick={() => setPhrase(x)}
+            >
+              {x.english}
+            </button>
+          ))}
+        </div>
       </div>
     </Modal>
   );

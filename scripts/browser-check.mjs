@@ -71,7 +71,7 @@ try {
     .first()
     .click();
   await expect(
-    page.getByRole("heading", { name: "A little room for possibility" }),
+    page.getByRole("heading", { name: "Scenarios", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Itinerary", exact: true }).click();
   await expect.poll(() => puts, { timeout: 5000 }).toBe(1);
@@ -182,7 +182,7 @@ try {
     .getByRole("button", { name: "Places & food", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Saved places" }),
+    page.locator("#place-results"),
   ).toBeVisible();
   await page
     .getByRole("combobox", { name: "Filter country" })

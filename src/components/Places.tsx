@@ -14,6 +14,7 @@ import {
   Phone,
   LoaderCircle,
   Languages,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   type LocalName,
@@ -248,14 +249,18 @@ function PhoneFill({ places }: { places: Place[] }) {
       ) : result ? (
         <span>{result}</span>
       ) : (
-        <span>
-          {missing.length} places have no phone number.
-          {!google &&
-            " Phone numbers mostly come from Google Maps; select it in Settings for the best results."}
-        </span>
+        <span>{missing.length} places have no phone number</span>
       )}
       {!progress && missing.length > 0 && (
-        <button className="button" onClick={() => void run()}>
+        <button
+          className="button"
+          title={
+            google
+              ? undefined
+              : "Phone numbers mostly come from Google Maps; select it in Settings for the best results"
+          }
+          onClick={() => void run()}
+        >
           Fill missing phones
         </button>
       )}
@@ -326,9 +331,7 @@ function LocalFill({ places }: { places: Place[] }) {
       ) : result ? (
         <span>{result}</span>
       ) : (
-        <span>
-          {missing.length} places have no local-language name or address.
-        </span>
+        <span>{missing.length} places have no local name or address</span>
       )}
       {!progress && missing.length > 0 && (
         <button className="button" onClick={() => void run()}>
@@ -365,6 +368,7 @@ export function Places({
   const [inPlan, setInPlan] = useState("");
   const [sort, setSort] = useState<"trip" | "name">("trip");
   const [showMap, setShowMap] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
@@ -492,22 +496,24 @@ export function Places({
               })()}
             </span>
           )}
-          <span
-            className={`geo-status ${p.lat === null ? "missing" : ""}`}
-            title={
-              p.geo === "approx"
-                ? "Exact place not found; using the city centre"
-                : undefined
-            }
-          >
-            {p.lat !== null
-              ? p.geo === "approx"
-                ? "Approx. location"
-                : "Located"
-              : p.geo === "failed"
-                ? "Not found"
-                : "Locating…"}
-          </span>
+          {(p.lat === null || p.geo === "approx") && (
+            <span
+              className={`geo-status ${p.lat === null ? "missing" : ""}`}
+              title={
+                p.geo === "approx"
+                  ? "Exact place not found; using the city centre"
+                  : undefined
+              }
+            >
+              {p.lat !== null
+                ? p.geo === "approx"
+                  ? "Approx. location"
+                  : "Located"
+                : p.geo === "failed"
+                  ? "Not found"
+                  : "Locating…"}
+            </span>
+          )}
         </div>
         {p.kind === "restaurant" && (
           <span
@@ -567,7 +573,6 @@ export function Places({
               Source
             </a>
           )}
-          <div className="spacer" />
           {p.geo === "failed" && p.lat === null ? (
             <button className="text-button" onClick={() => onEdit(p)}>
               <LocateFixed size={14} />
@@ -616,6 +621,9 @@ export function Places({
       </article>
     );
   };
+  const activeFilters = [country, city, kind, inPlan, halal].filter(
+    Boolean,
+  ).length;
   return (
     <div className="places-view">
       <div className="places-toolbar">
@@ -628,82 +636,95 @@ export function Places({
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <select
-          aria-label="Filter country"
-          value={country}
-          onChange={(e) => {
-            setCountry(e.target.value);
-            setCity("");
-          }}
+        <button
+          className={`button filters-toggle ${filtersOpen ? "active-button" : ""}`}
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen(!filtersOpen)}
         >
-          <option value="">All countries</option>
-          {[...new Set(data.places.map((p) => p.country))].map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Filter city"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-        >
-          <option value="">All cities</option>
-          {cities
-            .filter(
-              (c) =>
-                !country ||
-                data.places.some((p) => p.city === c && p.country === country),
-            )
-            .map((c) => (
+          <SlidersHorizontal size={16} />
+          Filters
+          {activeFilters > 0 && <small>{activeFilters}</small>}
+        </button>
+        <div className={`places-filters ${filtersOpen ? "open" : ""}`}>
+          <select
+            aria-label="Filter country"
+            value={country}
+            onChange={(e) => {
+              setCountry(e.target.value);
+              setCity("");
+            }}
+          >
+            <option value="">All countries</option>
+            {[...new Set(data.places.map((p) => p.country))].map((c) => (
               <option key={c}>{c}</option>
             ))}
-        </select>
-        <select
-          aria-label="Filter by plan"
-          value={inPlan}
-          onChange={(e) => setInPlan(e.target.value)}
-        >
-          <option value="">In the plan or not</option>
-          <option value="yes">In the plan</option>
-          <option value="no">Not planned yet</option>
-        </select>
-        <select
-          aria-label="Sort places"
-          value={sort}
-          onChange={(e) => setSort(e.target.value as "trip" | "name")}
-        >
-          <option value="trip">Trip order</option>
-          <option value="name">A–Z</option>
-        </select>
-        <select
-          aria-label="Filter place type"
-          value={kind}
-          onChange={(e) => {
-            setKind(e.target.value);
-            setHalal("");
-          }}
-        >
-          <option value="">All places</option>
-          <option value="attraction">Activities</option>
-          <option value="restaurant">Food</option>
-          <option value="hotel">Hotels</option>
-          <option value="station">Stations</option>
-          <option value="other">Other</option>
-        </select>
-        {kind === "restaurant" && (
-          <select
-            aria-label="Filter halal status"
-            value={halal}
-            onChange={(e) => setHalal(e.target.value)}
-          >
-            <option value="">All halal statuses</option>
-            <option value="verified">Certified / self-certified</option>
-            {Object.entries(halalLabels).map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
           </select>
-        )}
+          <select
+            aria-label="Filter city"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          >
+            <option value="">All cities</option>
+            {cities
+              .filter(
+                (c) =>
+                  !country ||
+                  data.places.some(
+                    (p) => p.city === c && p.country === country,
+                  ),
+              )
+              .map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+          </select>
+          <select
+            aria-label="Filter by plan"
+            value={inPlan}
+            onChange={(e) => setInPlan(e.target.value)}
+          >
+            <option value="">In the plan or not</option>
+            <option value="yes">In the plan</option>
+            <option value="no">Not planned yet</option>
+          </select>
+          <select
+            aria-label="Sort places"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as "trip" | "name")}
+          >
+            <option value="trip">Trip order</option>
+            <option value="name">A–Z</option>
+          </select>
+          <select
+            aria-label="Filter place type"
+            value={kind}
+            onChange={(e) => {
+              setKind(e.target.value);
+              setHalal("");
+            }}
+          >
+            <option value="">All places</option>
+            <option value="attraction">Activities</option>
+            <option value="restaurant">Food</option>
+            <option value="hotel">Hotels</option>
+            <option value="station">Stations</option>
+            <option value="other">Other</option>
+          </select>
+          {kind === "restaurant" && (
+            <select
+              aria-label="Filter halal status"
+              value={halal}
+              onChange={(e) => setHalal(e.target.value)}
+            >
+              <option value="">All halal statuses</option>
+              <option value="verified">Certified / self-certified</option>
+              {Object.entries(halalLabels).map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         <button
           className={`button ${showMap ? "active-button" : ""}`}
           aria-pressed={showMap}
@@ -741,11 +762,11 @@ export function Places({
       <PhoneFill places={data.places} />
       <LocalFill places={data.places} />
       <div className="list-heading" id="place-results">
-        <h2>Saved places</h2>
         <span>
           {filtered.length}
           {filtered.length !== data.places.length &&
-            ` of ${data.places.length}`}
+            ` of ${data.places.length}`}{" "}
+          places
         </span>
         {(query || country || city || kind || inPlan || halal) && (
           <button
